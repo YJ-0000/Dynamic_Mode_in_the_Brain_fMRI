@@ -4,7 +4,7 @@ current_path = pwd;
 labels_ref = cifti_read('atlas/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii');
 labels_cortical = cifti_read('atlas/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii');
 label_cortical_data = round(labels_cortical.cdata);
-labels_subcortical = cifti_read('atlas/Cortical_Subcortical.dscalar.nii');
+labels_subcortical = cifti_read('atlas/Subcortical_6thalamus.dscalar.nii');
 
 try
     label_subcortical_data = round(labels_subcortical.cdata);
@@ -14,7 +14,6 @@ catch
 end
 
 HCP_denoised_path = 'G:\HCP_3T_denoised';
-HCP_preprocessed_path = 'G:\HCP_3T_preproc';
 cd(HCP_denoised_path);
 folder_denoised_list = dir('*_fixextended');
 folder_denoised_list = folder_denoised_list([folder_denoised_list.isdir]);
@@ -115,5 +114,5 @@ end
 
 %%
 cd(current_path);
-save HCP_timeseries_cortical_subcortical_extracted_meta sub_ids folder_denoised_list N len_time label_idx_list
-save('HCP_timeseries_cortical_subcortical_extracted.mat', 'time_series_denoised', '-v7.3')
+save results/HCP_timeseries_cortical_subcortical_extracted_meta sub_ids folder_denoised_list N len_time label_idx_list
+save('results/HCP_timeseries_cortical_subcortical_extracted.mat', 'time_series_denoised', '-v7.3')
