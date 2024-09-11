@@ -1,6 +1,6 @@
 clear; clc;
-load('HCP_timeseries_cortical_subcortical_extracted_meta.mat');
-load('HCP_timeseries_cortical_subcortical_extracted.mat');
+load('results/HCP_timeseries_cortical_subcortical_extracted_meta.mat');
+load('results/HCP_timeseries_cortical_subcortical_extracted.mat');
 
 %%
 % Define the sampling frequency
@@ -32,5 +32,5 @@ parfor nsub = 1:size(time_series_denoised,1)
 end
 
 %%
-save HCP_timeseries_cortical_subcortical_extracted_filtered_meta sub_ids folder_denoised_list N
-save('HCP_timeseries_cortical_subcortical_extracted_filtered.mat', 'time_series_denoised_filtered', '-v7.3')
+save results/HCP_timeseries_cortical_subcortical_extracted_filtered_meta sub_ids folder_denoised_list N
+save('results/HCP_timeseries_cortical_subcortical_extracted_filtered.mat', 'time_series_denoised_filtered', '-v7.3')
