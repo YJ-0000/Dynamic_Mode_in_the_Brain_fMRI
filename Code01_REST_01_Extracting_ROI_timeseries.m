@@ -4,7 +4,7 @@ current_path = pwd;
 labels_ref = cifti_read('atlas/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii');
 labels_cortical = cifti_read('atlas/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii');
 label_cortical_data = round(labels_cortical.cdata);
-labels_subcortical = cifti_read('atlas/Subcortical_6thalamus.dscalar.nii');
+labels_subcortical = cifti_read('atlas/CortexSubcortex_ColeAnticevic_NetPartition_wSubcorGSR_parcels_LR.dlabel.nii');
 
 try
     label_subcortical_data = round(labels_subcortical.cdata);
