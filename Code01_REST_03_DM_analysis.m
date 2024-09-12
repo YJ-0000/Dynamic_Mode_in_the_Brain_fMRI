@@ -48,9 +48,9 @@ for nsub = 1:size(time_series_denoised_filtered,1)
             end
             
             % ROI normalization
-%             for nroi = 1:size(y_fine,1)
-%                 y_fine(nroi,:) = normalize(y_fine(nroi,:));
-%             end
+            for nroi = 1:size(y_fine,1)
+                y_fine(nroi,:) = normalize(y_fine(nroi,:));
+            end
             
             if isnan(sum(y_fine,'all'))
                 warning('There is NAN!!')
@@ -65,8 +65,11 @@ for nsub = 1:size(time_series_denoised_filtered,1)
     end
     tau(nsub) = tau_temp;
 end
-% X(:,i_num*(length(t_fine)-1)+1:end) = [];
-% Y(:,i_num*(length(t_fine)-1)+1:end) = [];
+X(:,i_num*(length(t_fine)-1)+1:end) = [];
+Y(:,i_num*(length(t_fine)-1)+1:end) = [];
+
+disp('*** total number of time points ***');
+disp([i_num*(length(t_fine)-1), size(X,2)]);
 
 
 clear time_series_denoised_filtered
