@@ -21,8 +21,8 @@ for ii = 1:(4*size(time_series_denoised_filtered,1))
 end
 
 t_sample = 0.72;
-% TRtarget = 0.72;
-TRtarget = 1.5;
+TRtarget = 0.72;
+% TRtarget = 1.5;
 
 t = (1:n_time) * (t_sample);
 t_fine = TRtarget:TRtarget:t(end);
@@ -75,8 +75,13 @@ disp([i_num*(length(t_fine)-1), size(X,2)]);
 clear time_series_denoised_filtered
 
 %%
-A=X/Y;
-B=Y/X;
+try 
+    A=X/Y;
+    B=Y/X;
+catch
+    A = X*inv(Y);
+    B = Y*inv(X);
+end
 A = (A/B)^0.5;
 A = real(A);
 
