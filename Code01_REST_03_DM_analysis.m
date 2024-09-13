@@ -141,7 +141,7 @@ save_dir = [pwd filesep 'DM_video_HCP_REST'];
 
 frame_dt = 0.5;
 
-for pair_num = 1:0%round(max_number_eigenstates/2)
+for pair_num = 1:10
     
     cd(save_dir);
     mkdir(['DM_pair', num2str(pair_num) '_4view']);
@@ -240,14 +240,14 @@ for n=1:length(tau)
     X_temp = X(:,tau_n+1:tau_n+tau(n));
     Y_temp = Y(:,tau_n+1:tau_n+tau(n));
     VY = V(1:max_number_eigenstates,:) * Y_temp;
-    for i=1:max_number_eigenstates
+    parfor i=1:max_number_eigenstates
         temp1 = U(:,i) * VY(i,:);
         for j=1:max_number_eigenstates  
             temp2 = U(:,j) * VY(j,:);
             C_temp(i,j) = 2 * sum(dot(temp1, temp2, 1));
         end
     end
-    for k=1:max_number_eigenstates
+    parfor k=1:max_number_eigenstates
         B_temp(k) = sum(diag(2*X_temp'*U(:,k)*VY(k,:)));
     end
     toc
