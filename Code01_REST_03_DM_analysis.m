@@ -21,8 +21,8 @@ for ii = 1:(4*size(time_series_denoised_filtered,1))
 end
 
 t_sample = 0.72;
-TRtarget = 0.72;
-% TRtarget = 1.5;
+% TRtarget = 0.72;
+TRtarget = 1.5;
 
 t = (1:n_time) * (t_sample);
 t_fine = TRtarget:TRtarget:t(end);
@@ -79,8 +79,28 @@ try
     A=X/Y;
     B=Y/X;
 catch
-    A = X*inv(Y);
-    B = Y*inv(X);
+    try
+        warning('Lack of memory! Derive pinv separately');
+        A = X*pinv(Y);
+        B = Y*pinv(X);
+    catch
+        warning('Lack of memory!! Use SVD.');
+        [U,S,V] = svd(Y,'econ');
+        temp1 = X*V;
+        clear V
+        temp2 = temp1/S;
+        clear temp1 S
+        A = temp2 * U';
+        clear temp2 U
+        
+        [U,S,V] = svd(X,'econ');
+        temp1 = Y*V;
+        clear V
+        temp2 = temp1/S;
+        clear temp1 S
+        B = temp2 * U';
+        clear temp2 U
+    end
 end
 A = (A/B)^0.5;
 A = real(A);
@@ -121,7 +141,7 @@ save_dir = [pwd filesep 'DM_video_HCP_REST'];
 
 frame_dt = 0.5;
 
-for pair_num = 1:1%round(max_number_eigenstates/2)
+for pair_num = 1:0%round(max_number_eigenstates/2)
     
     cd(save_dir);
     mkdir(['DM_pair', num2str(pair_num) '_4view']);
@@ -201,7 +221,7 @@ end
 %% individual fitting
 
 U=Phi_sorted(:,(1:max_number_eigenstates));
-V=pinv(U);
+V=inv(Phi_sorted);
 
 % C=zeros(max_number_eigenstates,max_number_eigenstates,length(tau));
 % B=zeros(max_number_eigenstates,length(tau));
@@ -219,7 +239,7 @@ for n=1:length(tau)
     tau_n = sum(tau(1:n-1));
     X_temp = X(:,tau_n+1:tau_n+tau(n));
     Y_temp = Y(:,tau_n+1:tau_n+tau(n));
-    VY = V * Y_temp;
+    VY = V(1:max_number_eigenstates,:) * Y_temp;
     for i=1:max_number_eigenstates
         temp1 = U(:,i) * VY(i,:);
         for j=1:max_number_eigenstates  
