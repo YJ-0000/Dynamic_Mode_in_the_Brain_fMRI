@@ -9,16 +9,17 @@ load('results/HCP_timeseries_cortical_subcortical_extracted_filtered.mat');
 n_time = 1200;
 i_num = 0;
 for ii = 1:(4*size(time_series_denoised_filtered,1))
-    disp(ii);
+%     disp(ii);
     nsub = ceil(ii/4); nses = rem(ii,4); if nses==0; nses=4;end
     if isempty(time_series_denoised_filtered{nsub,nses})
         continue
     end
-    if isnan(sum(time_series_denoised_filtered{nsub,nses},'all'))
-        continue
-    end
+%     if isnan(sum(time_series_denoised_filtered{nsub,nses},'all'))
+%         continue
+%     end
     i_num = i_num + 1;
 end
+disp(i_num)
 
 t_sample = 0.72;
 % TRtarget = 0.72;
@@ -38,7 +39,7 @@ for nsub = 1:size(time_series_denoised_filtered,1)
     tau_temp = 0;
     disp(nsub);
     for nses = 1:4
-        if ~isempty(time_series_denoised_filtered{nsub,nses}) && ~isnan(sum(time_series_denoised_filtered{nsub,nses},'all'))
+        if ~isempty(time_series_denoised_filtered{nsub,nses})
             y = time_series_denoised_filtered{nsub,nses};
             if t_sample ~= TRtarget
                 pp = spline(t, y);          % Compute piecewise polynomial (B-spline) representation
@@ -48,9 +49,9 @@ for nsub = 1:size(time_series_denoised_filtered,1)
             end
             
             % ROI normalization
-            for nroi = 1:size(y_fine,1)
-                y_fine(nroi,:) = normalize(y_fine(nroi,:));
-            end
+%             for nroi = 1:size(y_fine,1)
+%                 y_fine(nroi,:) = normalize(y_fine(nroi,:));
+%             end
             
             if isnan(sum(y_fine,'all'))
                 warning('There is NAN!!')
@@ -80,9 +81,11 @@ try
     B=Y/X;
 catch
     try
-        warning('Lack of memory! Derive pinv separately');
-        A = X*pinv(Y);
-        B = Y*pinv(X);
+        warning('Lack of memory! Use Extended DMD.');
+        A1 = X*Y'; A2 = Y*Y';
+        A = A1 * pinv(A2);
+        B1 = Y*X'; B2 = X*X';
+        B = B1 * pinv(B2);
     catch
         warning('Lack of memory!! Use SVD.');
         [U,S,V] = svd(Y,'econ');
@@ -141,7 +144,7 @@ save_dir = [pwd filesep 'DM_video_HCP_REST'];
 
 frame_dt = 0.5;
 
-for pair_num = 1:10
+for pair_num = 1:0
     
     cd(save_dir);
     mkdir(['DM_pair', num2str(pair_num) '_4view']);
@@ -219,10 +222,10 @@ for pair_num = 1:10
 end
 
 %% individual fitting
-
+max_number_eigenstates = 70;
 U=Phi_sorted(:,(1:max_number_eigenstates));
 V=inv(Phi_sorted);
-
+ones_tril = logical(tril(ones(max_number_eigenstates,max_number_eigenstates),-1));
 % C=zeros(max_number_eigenstates,max_number_eigenstates,length(tau));
 % B=zeros(max_number_eigenstates,length(tau));
 D=zeros(max_number_eigenstates,length(tau));
@@ -241,14 +244,12 @@ for n=1:length(tau)
     Y_temp = Y(:,tau_n+1:tau_n+tau(n));
     VY = V(1:max_number_eigenstates,:) * Y_temp;
     parfor i=1:max_number_eigenstates
-        temp1 = U(:,i) * VY(i,:);
         for j=1:max_number_eigenstates  
-            temp2 = U(:,j) * VY(j,:);
-            C_temp(i,j) = 2 * sum(dot(temp1, temp2, 1));
+            C_temp(i,j) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
         end
     end
     parfor k=1:max_number_eigenstates
-        B_temp(k) = sum(diag(2*X_temp'*U(:,k)*VY(k,:)));
+        B_temp(k) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
     end
     toc
 
@@ -258,5 +259,5 @@ for n=1:length(tau)
     disp(['end: sub#' num2str(n)]);
 end
 
-save results/DM_cortical_subcortical_indiv tau Phi_sorted lambda A D sub_ids max_number_eigenstates
+save DMs/DM_cortical_subcortical_indiv_70 tau Phi_sorted lambda A D sub_ids max_number_eigenstates
 

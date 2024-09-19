@@ -73,6 +73,7 @@ for n_task = 1:length(task_names)
                         trial_types = {'cue','present_math','present_story','question_math','question_story','response_math','response_story'};
                         temp_cell = cell(1,length(trial_types));
                         for n_trial = 1:length(trial_types)
+                            task_info = readtable([trial_types{n_trial},'.txt'], "FileType","text",'Delimiter', '\t');
                             temp_cell{n_trial} = task_info;
                         end
                         task_input{nsub,nses} = temp_cell;
