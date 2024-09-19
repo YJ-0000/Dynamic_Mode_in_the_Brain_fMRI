@@ -76,55 +76,37 @@ disp([i_num*(length(t_fine)-1), size(X,2)]);
 clear time_series_denoised_filtered
 
 %%
-try 
-    A=X/Y;
-    B=Y/X;
-catch
-    try
-        warning('Lack of memory! Use Extended DMD.');
-        A1 = X*Y'; A2 = Y*Y';
-        A = A1 * pinv(A2);
-        B1 = Y*X'; B2 = X*X';
-        B = B1 * pinv(B2);
-    catch
-        warning('Lack of memory!! Use SVD.');
-        [U,S,V] = svd(Y,'econ');
-        temp1 = X*V;
-        clear V
-        temp2 = temp1/S;
-        clear temp1 S
-        A = temp2 * U';
-        clear temp2 U
-        
-        [U,S,V] = svd(X,'econ');
-        temp1 = Y*V;
-        clear V
-        temp2 = temp1/S;
-        clear temp1 S
-        B = temp2 * U';
-        clear temp2 U
-    end
-end
-A = (A/B)^0.5;
-A = real(A);
+[U_f,S_f,V_f] = svd(Y,'econ'); % SVD matrix
+beta = size(Y,2)/size(Y,1); % aspect ratio of matrix 
+singular_values = diag(S_f); % extract singular values
+% semilogy(singular_values,'k-o','LineWidth',1.2)
+singular_values_squared = singular_values .^ 2;
+total_variance = sum(singular_values_squared);
+cumulative_variance = cumsum(singular_values_squared);
+variance_explained = cumulative_variance / total_variance;
+% r = find(variance_explained >= 0.999, 1);
 
-[Phi,Diag]=eig(A);
-dd = abs(diag(Diag));
-[dd_sorted,idx_sorted] = sort(dd,'descend');
-max_number_eigenstates=knee_pt(dd_sorted);
-max_number_eigenstates=2*floor(max_number_eigenstates/2);
-Phi_sorted=Phi(:,idx_sorted);
+r = 716; % exclude too low variance compenents
+U_f(:, (r+1):end) = [];
+S_f = S_f(1:r, 1:r);
+V_f(:, (r+1):end) = [];
+A_tilde_f = U_f' * X * V_f / S_f;
+clear U_f
 
-lambda = diag(Diag);
-lambda = lambda(idx_sorted);
-D_ang = angle(lambda);
+[U_b, S_b, V_b] = svd(X, 'econ');
+U_b(:, (r+1):end) = [];
+S_b = S_b(1:r, 1:r);
+V_b(:, (r+1):end) = [];
+A_tilde_b = U_b' * Y * V_b / S_b;
+clear U_v V_v S_b
 
-aaa = log(0.5) ./ log(abs(lambda));
-bbb = 2*pi./D_ang;
-ccc = (aaa./abs(bbb));
+A_tilde = (A_tilde_f / A_tilde_b) ^ 0.5;
+[W, D] = eig(A_tilde);
+lambda = diag(D);
+Phi_sorted = X * V_f / S_f * W;
 
 %%
-save DMs/DM_cortical_subcortical Phi_sorted lambda A max_number_eigenstates
+save DMs/DM_cortical_subcortical_SVD_noROInorm Phi_sorted lambda A_tilde
 
 %%
 cd(current_path);
@@ -139,12 +121,12 @@ catch
     label_idx_list = 1:N;
 end
 
-mkdir('DM_video_HCP_REST');
-save_dir = [pwd filesep 'DM_video_HCP_REST'];
+mkdir('DM_video_HCP_REST_SVD');
+save_dir = [pwd filesep 'DM_video_HCP_REST_SVD'];
 
 frame_dt = 0.5;
 
-for pair_num = 1:0
+for pair_num = 1:5
     
     cd(save_dir);
     mkdir(['DM_pair', num2str(pair_num) '_4view']);
@@ -222,12 +204,9 @@ for pair_num = 1:0
 end
 
 %% individual fitting
-max_number_eigenstates = 70;
+max_number_eigenstates = 10;
 U=Phi_sorted(:,(1:max_number_eigenstates));
-V=inv(Phi_sorted);
-ones_tril = logical(tril(ones(max_number_eigenstates,max_number_eigenstates),-1));
-% C=zeros(max_number_eigenstates,max_number_eigenstates,length(tau));
-% B=zeros(max_number_eigenstates,length(tau));
+V=pinv(Phi_sorted);
 D=zeros(max_number_eigenstates,length(tau));
 for n=1:length(tau)
     if tau(n) == 0
@@ -253,11 +232,9 @@ for n=1:length(tau)
     end
     toc
 
-%     C(:,:,n) = C_temp;
-%     B(:,n) = B_temp;
     D(:,n) = C_temp\B_temp;
     disp(['end: sub#' num2str(n)]);
 end
 
-save DMs/DM_cortical_subcortical_indiv_70 tau Phi_sorted lambda A D sub_ids max_number_eigenstates
+save DMs/DM_cortical_subcortical_SVD_noROInorm_indiv_10 tau Phi_sorted lambda D sub_ids max_number_eigenstates
 
