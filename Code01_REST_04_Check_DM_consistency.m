@@ -98,6 +98,8 @@ D1(:,idx_exclude) = [];
 D2(:,idx_exclude) = [];
 sub_ids(idx_exclude) = [];
 
+save DMs/DMs_REST_test_retest_indiv_12 D1 D2 sub_ids
+
 %%
 % sub_qc_issue = readtable('data/QC_issue_Subjects.csv');
 % sub_qc_issue = sub_qc_issue(:,1).Variables;
