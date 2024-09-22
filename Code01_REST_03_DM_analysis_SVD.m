@@ -204,9 +204,15 @@ for pair_num = 1:5
 end
 
 %% individual fitting
-max_number_eigenstates = 10;
-U=Phi_sorted(:,(1:max_number_eigenstates));
-V=pinv(Phi_sorted);
+idx_exclude = abs(angle(lambda)) < 1e-10;
+lambda(idx_exclude) = [];
+Phi_sorted(:,idx_exclude) = [];
+
+max_number_eigenstates = 12;
+U=Phi_sorted;
+% U(:,[9,10,11,12,17,18]) = U(:,[11,12,17,18,9,10]);
+U(:,[11,12,17,18]) = U(:,[17,18,11,12]);
+V=pinv(U);
 D=zeros(max_number_eigenstates,length(tau));
 for n=1:length(tau)
     if tau(n) == 0
@@ -222,12 +228,12 @@ for n=1:length(tau)
     X_temp = X(:,tau_n+1:tau_n+tau(n));
     Y_temp = Y(:,tau_n+1:tau_n+tau(n));
     VY = V(1:max_number_eigenstates,:) * Y_temp;
-    parfor i=1:max_number_eigenstates
+    for i=1:max_number_eigenstates
         for j=1:max_number_eigenstates  
             C_temp(i,j) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
         end
     end
-    parfor k=1:max_number_eigenstates
+    for k=1:max_number_eigenstates
         B_temp(k) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
     end
     toc
@@ -236,5 +242,5 @@ for n=1:length(tau)
     disp(['end: sub#' num2str(n)]);
 end
 
-save DMs/DM_cortical_subcortical_SVD_noROInorm_indiv_10 tau Phi_sorted lambda D sub_ids max_number_eigenstates
+save DMs/DM_cortical_subcortical_SVD_noROInorm_indiv_12 tau Phi_sorted lambda D sub_ids max_number_eigenstates
 

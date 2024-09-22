@@ -8,6 +8,11 @@ load('results/HCP_timeseries_cortical_subcortical_extracted_filtered.mat');
 %%
 
 load DMs/DM_cortical_subcortical_SVD_noROInorm
+
+idx_exclude = abs(angle(lambda)) < 1e-10;
+lambda(idx_exclude) = [];
+Phi_sorted(:,idx_exclude) = [];
+
 n_time = 1200;
 
 t_sample = 0.72;
@@ -17,11 +22,10 @@ TRtarget = 1.5;
 t = (1:n_time) * (t_sample);
 t_fine = TRtarget:TRtarget:t(end);
 
-% Phi_sorted(:,[9,10,11,12]) = Phi_sorted(:,[11,12,9,10]);
-
-max_number_eigenstates = 10;
-U=Phi_sorted(:,(1:max_number_eigenstates));
-V=pinv(Phi_sorted);
+max_number_eigenstates = 12;
+U=Phi_sorted;
+U(:,[11,12,17,18]) = U(:,[17,18,11,12]);
+V=pinv(U);
 D1=zeros(max_number_eigenstates,size(time_series_denoised_filtered,1));
 D2=zeros(max_number_eigenstates,size(time_series_denoised_filtered,1));
 idx_exclude = false(1,size(time_series_denoised_filtered,1));
@@ -108,10 +112,10 @@ sub_ids(idx_exclude) = [];
 % sub_ids(idx_qc_issue) = [];
 
 %%
-rest_self_corr = zeros(1,10);
-rest_self_sig = zeros(1,10);
+rest_self_corr = zeros(1,max_number_eigenstates);
+rest_self_sig = zeros(1,max_number_eigenstates);
 % rest_self_ICC = zeros(1,10);
-for n_dm = 1:5
+for n_dm = 1:(max_number_eigenstates/2)
     temp_D1 = D1(2*(n_dm-1)+1,:);
     temp_D2 = D2(2*(n_dm-1)+1,:);
     
