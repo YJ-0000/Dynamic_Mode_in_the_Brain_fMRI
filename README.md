@@ -8,4 +8,4 @@ You need following MATLAB toolbox.
 
 You need following atlas.
 ** Glasser 2016 (https://balsa.wustl.edu/study/RVVG)
-** An extended Human Connectome Project multimodal parcellation atlas of the human cortex and subcortical areas (https://github.com/wayalan/HCPex)
+** The Cole-Anticevic Brain-wide Network Partition (https://github.com/ColeLab/ColeAnticevicNetPartition)
