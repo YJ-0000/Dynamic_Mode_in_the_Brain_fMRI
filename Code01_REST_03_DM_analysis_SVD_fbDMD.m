@@ -126,7 +126,7 @@ save_dir = [pwd filesep 'DM_video_HCP_REST_SVD'];
 
 frame_dt = 0.5;
 
-for pair_num = 1:5
+for pair_num = 1:0
     
     cd(save_dir);
     mkdir(['DM_pair', num2str(pair_num) '_4view']);
@@ -204,14 +204,27 @@ for pair_num = 1:5
 end
 
 %% individual fitting
-idx_exclude = abs(angle(lambda)) < 1e-10;
-lambda(idx_exclude) = [];
-Phi_sorted(:,idx_exclude) = [];
+cd(current_path);
 
 max_number_eigenstates = 12;
+
+idx_exclude = abs(angle(lambda)) < 1e-10;
+lambda(idx_exclude) = [];
 U=Phi_sorted;
+
+Phi_sorted(:,idx_exclude) = [];
+count_roi = zeros(size(U,1),1);
+for n=1:length(tau)
+    tau_n = sum(tau(1:n-1));
+    X_temp = X(:,tau_n+1:tau_n+tau(n));
+    var_y = var(X_temp,0,2);
+    count_roi = count_roi + (var_y<0.0001);
+end
+U(count_roi>0,:)=[];
+
 % U(:,[9,10,11,12,17,18]) = U(:,[11,12,17,18,9,10]);
-U(:,[11,12,17,18]) = U(:,[17,18,11,12]);
+% U(:,[11,12,17,18]) = U(:,[17,18,11,12]);
+U(:,[9,10,17,18]) = U(:,[17,18,9,10]);
 V=pinv(U);
 D=zeros(max_number_eigenstates,length(tau));
 for n=1:length(tau)
@@ -227,6 +240,8 @@ for n=1:length(tau)
     tau_n = sum(tau(1:n-1));
     X_temp = X(:,tau_n+1:tau_n+tau(n));
     Y_temp = Y(:,tau_n+1:tau_n+tau(n));
+    X_temp(count_roi>0,:)=[];
+    Y_temp(count_roi>0,:)=[];
     VY = V(1:max_number_eigenstates,:) * Y_temp;
     for i=1:max_number_eigenstates
         for j=1:max_number_eigenstates  
