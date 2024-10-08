@@ -158,8 +158,8 @@ save DMs/DM_cortical_subcortical_noROInorm_CV Phi_fold lambda_fold roi_exclude
 %% CV prediction
 disp('*** CV prediction started! ***');
 max_DMs = 24;
-% loss_fold = zeros(cv_num,max_DMs/2);
-for n_cv = 2:cv_num
+loss_fold = zeros(cv_num,max_DMs);
+for n_cv = 1:cv_num
     disp(['=== CV prediction fold #',num2str(n_cv),'===']);
     lambda = lambda_fold{n_cv};
     Phi_sorted = Phi_fold{n_cv};
@@ -173,6 +173,7 @@ for n_cv = 2:cv_num
         V=pinv(U);
         
         loss_fold_current = zeros(1,length(current_test_subjects));
+        loss2_fold_current = loss_fold_current;
         session_count = zeros(1,length(current_test_subjects));
         for n_test = 1:length(current_test_subjects)
             current_subject = current_test_subjects(n_test);
@@ -183,6 +184,7 @@ for n_cv = 2:cv_num
             X_test = X(:,is_test);
             Y_test = Y(:,is_test);
             loss_session = zeros(1,num_session);
+            loss2_session = loss_session;
             for n_ses = 1:num_session
                 X_test_sess = X_test(:,(n_ses-1)*(length(t_fine)-1)+1:n_ses*(length(t_fine)-1));
                 Y_test_sess = Y_test(:,(n_ses-1)*(length(t_fine)-1)+1:n_ses*(length(t_fine)-1));
@@ -209,27 +211,40 @@ for n_cv = 2:cv_num
                     B_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
                 end
 
-
+                % with autocorrelation term
                 D = C_temp\B_temp;
-
                 A_approx = D(1)*eye(size(X_temp,1));
                 for i = 1:num_DMs
                     A_approx = A_approx + D(i+1) * U(:,i) * V(i,:);
                 end
                 A_approx = real(A_approx);
                 loss = sum((X_temp_pred - A_approx * Y_temp_pred).^2,'all');
-
+                
+                % without autocorrelation term
+                D2 = C_temp(2:end,2:end)\B_temp(2:end);
+                A_approx = zeros(size(X_temp,1));
+                for i = 1:num_DMs
+                    A_approx = A_approx + D2(i) * U(:,i) * V(i,:);
+                end
+                A_approx = real(A_approx);
+                loss2 = sum((X_temp_pred - A_approx * Y_temp_pred).^2,'all');
+                
+                % null model - only consider autocorrelation
                 a_null = real(B_temp(1)/C_temp(1));
                 loss_null = sum((X_temp_pred - a_null * Y_temp_pred).^2,'all');
 
                 loss_session(n_ses) = loss/loss_null;
+                loss2_session(n_ses) = loss2/loss_null;
             end
             
             loss_fold_current(n_test) = mean(loss_session);
+            loss2_fold_current(n_test) = mean(loss2_session);
             session_count(n_test) = num_session;
         end
         loss_fold_current(isnan(loss_fold_current)) = 0;
+        loss2_fold_current(isnan(loss2_fold_current)) = 0;
         loss_fold(n_cv,num_DMs/2) = sum(loss_fold_current.*session_count)/sum(session_count);
+        loss_fold(n_cv,max_DMs/2+num_DMs/2) = sum(loss2_fold_current.*session_count)/sum(session_count);
         toc
     end
     disp('===== Fold Done ====');
