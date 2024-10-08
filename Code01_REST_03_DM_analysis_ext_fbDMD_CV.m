@@ -155,6 +155,38 @@ end
 %% save CV results
 save DMs/DM_cortical_subcortical_noROInorm_CV Phi_fold lambda_fold roi_exclude
 
+%% Testing DM consistency
+max_DMs = 18;
+
+Phi_abs_all = [];
+for n_cv = 1:cv_num
+    Phi = Phi_fold{n_cv};
+    Phi_abs_all = [Phi_abs_all,abs(Phi(:,1:2:max_DMs))]; %#ok<AGROW>
+end
+[cluster_idx, C] = kmeans(Phi_abs_all', max_DMs/2, 'Replicates', 10);
+for n_cv = 1:cv_num
+    assert(length(unique(cluster_idx((n_cv-1)*max_DMs/2+1:n_cv*max_DMs/2))) == max_DMs/2)
+end
+
+consistency_list = cell(max_DMs/2,1);
+for n_dm = 1:max_DMs/2
+    figure;
+    iter_n = 0;
+    Phi_select = Phi_abs_all(:,cluster_idx==n_dm);
+    corr_mat = zeros(cv_num);
+    for n_cv1 = 1:cv_num
+        for n_cv2 = 1:cv_num
+            iter_n = iter_n + 1;
+            subplot(cv_num,cv_num,iter_n);
+            scatter(Phi_select(:,n_cv1),Phi_select(:,n_cv2))
+            
+            r = corrcoef(Phi_select(:,n_cv1),Phi_select(:,n_cv2));
+            corr_mat(n_cv1,n_cv2) = r(2);
+        end
+    end
+    consistency_list{n_dm} = corr_mat;
+end
+
 %% CV prediction
 disp('*** CV prediction started! ***');
 max_DMs = 24;
