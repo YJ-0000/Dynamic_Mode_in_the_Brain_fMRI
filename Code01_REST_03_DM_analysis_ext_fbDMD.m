@@ -9,14 +9,10 @@ load('results/HCP_timeseries_cortical_subcortical_extracted_filtered.mat');
 n_time = 1200;
 i_num = 0;
 for ii = 1:(4*size(time_series_denoised_filtered,1))
-%     disp(ii);
     nsub = ceil(ii/4); nses = rem(ii,4); if nses==0; nses=4;end
     if isempty(time_series_denoised_filtered{nsub,nses})
         continue
     end
-%     if isnan(sum(time_series_denoised_filtered{nsub,nses},'all'))
-%         continue
-%     end
     i_num = i_num + 1;
 end
 disp(i_num)
@@ -48,11 +44,6 @@ for nsub = 1:size(time_series_denoised_filtered,1)
                 y_fine = y;
             end
             
-            % ROI normalization
-%             for nroi = 1:size(y_fine,1)
-%                 y_fine(nroi,:) = normalize(y_fine(nroi,:));
-%             end
-            
             if isnan(sum(y_fine,'all'))
                 warning('There is NAN!!')
             end
@@ -72,41 +63,37 @@ Y(:,i_num*(length(t_fine)-1)+1:end) = [];
 disp('*** total number of time points ***');
 disp([i_num*(length(t_fine)-1), size(X,2)]);
 
+% removing rois with no signal
+var_X = var(X,0,2);
+roi_exclude = var_X < 0.001;
+X(roi_exclude,:) = [];
+Y(roi_exclude,:) = [];
 
 clear time_series_denoised_filtered
 
 %%
-[U_f,S_f,V_f] = svd(Y,'econ'); % SVD matrix
-beta = size(Y,2)/size(Y,1); % aspect ratio of matrix 
-singular_values = diag(S_f); % extract singular values
-% semilogy(singular_values,'k-o','LineWidth',1.2)
-singular_values_squared = singular_values .^ 2;
-total_variance = sum(singular_values_squared);
-cumulative_variance = cumsum(singular_values_squared);
-variance_explained = cumulative_variance / total_variance;
-% r = find(variance_explained >= 0.999, 1);
+%%% fbDMD
+disp('*** Extended fbDMD ***');
+tic
+A1 = X*Y'; A2 = Y*Y';
+A_f = A1 * pinv(A2);
+B1 = Y*X'; B2 = X*X';
+A_b = B1 * pinv(B2);
+A = (A_f/A_b)^0.5;
+A = real(A);
+toc
 
-r = 716; % exclude too low variance compenents
-U_f(:, (r+1):end) = [];
-S_f = S_f(1:r, 1:r);
-V_f(:, (r+1):end) = [];
-A_tilde_f = U_f' * X * V_f / S_f;
-clear U_f
-
-[U_b, S_b, V_b] = svd(X, 'econ');
-U_b(:, (r+1):end) = [];
-S_b = S_b(1:r, 1:r);
-V_b(:, (r+1):end) = [];
-A_tilde_b = U_b' * Y * V_b / S_b;
-clear U_v V_v S_b
-
-A_tilde = (A_tilde_f / A_tilde_b) ^ 0.5;
-[W, D] = eig(A_tilde);
+[Phi_sorted,D] = eig(A);
 lambda = diag(D);
-Phi_sorted = X * V_f / S_f * W;
+idx_exclude = (abs(angle(lambda)) < 2*pi*1.5*0.01) | (abs(lambda)>1);
+lambda(idx_exclude) = [];
+Phi_sorted(:,idx_exclude) = [];
+[lambda,idx_sort] = sort(lambda,'descend');
+Phi_sorted = Phi_sorted(:,idx_sort);
+    
 
 %%
-save DMs/DM_cortical_subcortical_SVD_noROInorm Phi_sorted lambda A_tilde
+save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm Phi_sorted lambda A roi_exclude
 
 %%
 cd(current_path);
@@ -121,12 +108,12 @@ catch
     label_idx_list = 1:N;
 end
 
-mkdir('DM_video_HCP_REST_SVD');
-save_dir = [pwd filesep 'DM_video_HCP_REST_SVD'];
+mkdir('DM_video_HCP_REST_fbDMD');
+save_dir = [pwd filesep 'DM_video_HCP_REST_fbDMD'];
 
 frame_dt = 0.5;
 
-for pair_num = 1:0
+for pair_num = 1:9
     
     cd(save_dir);
     mkdir(['DM_pair', num2str(pair_num) '_4view']);
@@ -152,7 +139,7 @@ for pair_num = 1:0
         fh = conn_mesh_display(['DM_pair', num2str(pair_num), '_', num2str(frame,'%04d'), '.nii']);
         fh('colormap','bluewhitered');
         fh('colorbar','on');
-%         fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num)))/2,max(abs(Phi_sorted(:,DM_conjugate1_num)))/2]);
+%         fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num)))/3,max(abs(Phi_sorted(:,DM_conjugate1_num)))/3]);
         fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num))),max(abs(Phi_sorted(:,DM_conjugate1_num)))]);
         fh('print',4,['DM_pair', num2str(pair_num), '_', num2str(frame,'%04d'),'.jpg'],'-r150','-nogui') 
         
@@ -203,53 +190,42 @@ for pair_num = 1:0
     close(outputVideo);
 end
 
-%% individual fitting
+%% individual fitting (based on optDMD)
 cd(current_path);
 
-max_number_eigenstates = 12;
+num_DMs = 18;
 
-idx_exclude = abs(angle(lambda)) < 1e-10;
-lambda(idx_exclude) = [];
-U=Phi_sorted;
+U=Phi_sorted(:,1:num_DMs);
 
-Phi_sorted(:,idx_exclude) = [];
-count_roi = zeros(size(U,1),1);
-for n=1:length(tau)
-    tau_n = sum(tau(1:n-1));
-    X_temp = X(:,tau_n+1:tau_n+tau(n));
-    var_y = var(X_temp,0,2);
-    count_roi = count_roi + (var_y<0.0001);
-end
-U(count_roi>0,:)=[];
-
-% U(:,[9,10,11,12,17,18]) = U(:,[11,12,17,18,9,10]);
-% U(:,[11,12,17,18]) = U(:,[17,18,11,12]);
-U(:,[9,10,17,18]) = U(:,[17,18,9,10]);
 V=pinv(U);
-D=zeros(max_number_eigenstates,length(tau));
+D=zeros(num_DMs+1,length(tau));
 for n=1:length(tau)
     if tau(n) == 0
         continue;
     end
     
     disp(['start: sub#' num2str(n)]);
-    C_temp = zeros(max_number_eigenstates,max_number_eigenstates);
-    B_temp = zeros(max_number_eigenstates,1);
+    C_temp = zeros(num_DMs+1,num_DMs+1);
+    B_temp = zeros(num_DMs+1,1);
     
     tic
     tau_n = sum(tau(1:n-1));
     X_temp = X(:,tau_n+1:tau_n+tau(n));
     Y_temp = Y(:,tau_n+1:tau_n+tau(n));
-    X_temp(count_roi>0,:)=[];
-    Y_temp(count_roi>0,:)=[];
-    VY = V(1:max_number_eigenstates,:) * Y_temp;
-    for i=1:max_number_eigenstates
-        for j=1:max_number_eigenstates  
-            C_temp(i,j) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
+    VY = V(1:num_DMs,:) * Y_temp;
+    C_temp(1,1) = sum(dot(Y_temp, Y_temp, 1));
+    for j=1:num_DMs
+        C_temp(1,j+1) = sum(dot(U(:,j)'*Y_temp, VY(j,:), 1));
+    end
+    C_temp(2:end,1) = C_temp(1,2:end)';
+    for i=1:num_DMs
+        for j=1:num_DMs  
+            C_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
         end
     end
-    for k=1:max_number_eigenstates
-        B_temp(k) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
+    B_temp(1) = sum(dot(Y_temp,X_temp,1));
+    for k=1:num_DMs
+        B_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
     end
     toc
 
@@ -257,5 +233,5 @@ for n=1:length(tau)
     disp(['end: sub#' num2str(n)]);
 end
 
-save DMs/DM_cortical_subcortical_SVD_noROInorm_indiv_12 tau Phi_sorted lambda D sub_ids max_number_eigenstates
+save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_18 tau Phi_sorted lambda D sub_ids num_DMs
 
