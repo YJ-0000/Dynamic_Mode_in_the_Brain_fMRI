@@ -18,9 +18,10 @@ TRtarget = 1.5;
 t = (1:n_time) * (t_sample);
 t_fine = TRtarget:TRtarget:t(end);
 
-num_DMs = 18;
+num_DMs = 10;
 U=Phi_sorted(:,1:num_DMs);
 V=pinv(U);
+residual_matrix = eye(size(U,1)) - U*V;
 D1=zeros(num_DMs+1,size(time_series_denoised_filtered,1));
 D2=zeros(num_DMs+1,size(time_series_denoised_filtered,1));
 idx_exclude = false(1,size(time_series_denoised_filtered,1));
@@ -71,9 +72,10 @@ for nsub = 1:size(time_series_denoised_filtered,1)
                 Y_temp = Y2;
             end
             VY = V(1:num_DMs,:) * Y_temp;
-            C_temp(1,1) = sum(dot(Y_temp, Y_temp, 1));
+            resid_Y_temp = residual_matrix * Y_temp;
+            C_temp(1,1) = sum(dot(resid_Y_temp, resid_Y_temp, 1));
             for j=1:num_DMs
-                C_temp(1,j+1) = sum(dot(U(:,j)'*Y_temp, VY(j,:), 1));
+                C_temp(1,j+1) = sum(dot(U(:,j)'*resid_Y_temp, VY(j,:), 1));
             end
             C_temp(2:end,1) = C_temp(1,2:end)';
             for i=1:num_DMs
@@ -81,7 +83,7 @@ for nsub = 1:size(time_series_denoised_filtered,1)
                     C_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
                 end
             end
-            B_temp(1) = sum(dot(Y_temp,X_temp,1));
+            B_temp(1) = sum(dot(resid_Y_temp,X_temp,1));
             for k=1:num_DMs
                 B_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
             end
@@ -100,7 +102,7 @@ D1(:,idx_exclude) = [];
 D2(:,idx_exclude) = [];
 sub_ids(idx_exclude) = [];
 
-save DMs/DMs_REST_test_retest_indiv_18 D1 D2 sub_ids
+save DMs/DMs_REST_test_retest_indiv_10 D1 D2 sub_ids
 
 %%
 rest_self_corr = zeros(1,num_DMs);

@@ -113,6 +113,8 @@ end
 disp('*** CV DM estimation started! ***');
 lambda_fold = cell(cv_num,1);
 Phi_fold = cell(cv_num,1);
+Phi_all_fold = cell(cv_num,1);
+lambda_all_fold = cell(cv_num,1);
 for n_cv = 1:cv_num
     disp(['=== CV DM estimation fold #',num2str(n_cv),'===']);
     current_train_subjects = train_id_list{n_cv};
@@ -140,16 +142,22 @@ for n_cv = 1:cv_num
     [Phi_sorted,D] = eig(A);
     lambda = diag(D);
     idx_exclude = (abs(angle(lambda)) < 2*pi*1.5*0.01) | (abs(lambda)>1);
+    lambda_rest  = lambda(idx_exclude);
     lambda(idx_exclude) = [];
+    Phi_rest = Phi_sorted(:,idx_exclude);
     Phi_sorted(:,idx_exclude) = [];
     [lambda,idx_sort] = sort(lambda,'descend');
     Phi_sorted = Phi_sorted(:,idx_sort);
+    [lambda_rest,idx_sort] = sort(lambda_rest,'descend');
+    Phi_rest_sorted = Phi_rest(:,idx_sort);
     
     toc
     disp(['=== DONE ===']);
     
     lambda_fold{n_cv} = lambda;
     Phi_fold{n_cv} = Phi_sorted;
+    Phi_all_fold{n_cv} = [Phi_sorted,Phi_rest_sorted];
+    lambda_all_fold{n_cv} = [lambda;lambda_rest];
 end
 
 %% save CV results
@@ -190,22 +198,41 @@ end
 %% CV prediction
 disp('*** CV prediction started! ***');
 max_DMs = 24;
-loss_fold = zeros(cv_num,max_DMs);
+loss_fold = zeros(cv_num,max_DMs/2);
+R_squared_zero_fold = zeros(cv_num,max_DMs/2);
+R_squared_null_fold = zeros(cv_num,max_DMs/2);
+R_squared_fold = zeros(cv_num,max_DMs/2);
 for n_cv = 1:cv_num
     disp(['=== CV prediction fold #',num2str(n_cv),'===']);
     lambda = lambda_fold{n_cv};
     Phi_sorted = Phi_fold{n_cv};
+    Phi_all = Phi_all_fold{n_cv};
     
     current_train_subjects = train_id_list{n_cv};
     current_test_subjects = test_id_list{n_cv};
     
     for num_DMs = 2:2:max_DMs
         tic
+        
+        %%% Projecting BOLD acitivity to the target sub-space not considering other possible modes
         U=Phi_sorted(:,1:num_DMs);
         V=pinv(U);
+        residual_matrix = eye(size(U,1)) - U*V;
+
+        %%% Projecting BOLD acitivity to the target sub-space only considering physically plausible modes
+%         U=Phi_sorted;
+%         V=pinv(U);
+%         residual_matrix = eye(size(U,1)) - U(:,1:num_DMs)*V(1:num_DMs,:);
+        
+        %%% Projecting BOLD acitivity to the target sub-space considering all group-level modes
+%         U=Phi_all;
+%         V=pinv(U);
+%         residual_matrix = eye(size(U,1)) - U(:,1:num_DMs)*V(1:num_DMs,:);
         
         loss_fold_current = zeros(1,length(current_test_subjects));
-        loss2_fold_current = loss_fold_current;
+        R_squared_fold_current = loss_fold_current;
+        R_squared_fold_null_current = loss_fold_current;
+        R_squared_fold_zero_current = loss_fold_current;
         session_count = zeros(1,length(current_test_subjects));
         for n_test = 1:length(current_test_subjects)
             current_subject = current_test_subjects(n_test);
@@ -216,7 +243,9 @@ for n_cv = 1:cv_num
             X_test = X(:,is_test);
             Y_test = Y(:,is_test);
             loss_session = zeros(1,num_session);
-            loss2_session = loss_session;
+            R_squared_zero_session = loss_session;
+            R_squared_null_session = loss_session;
+            R_squared_session = loss_session;
             for n_ses = 1:num_session
                 X_test_sess = X_test(:,(n_ses-1)*(length(t_fine)-1)+1:n_ses*(length(t_fine)-1));
                 Y_test_sess = Y_test(:,(n_ses-1)*(length(t_fine)-1)+1:n_ses*(length(t_fine)-1));
@@ -225,12 +254,13 @@ for n_cv = 1:cv_num
 
                 X_temp = X_test_sess(:,1:round(length(t_fine)*4/5));
                 Y_temp = Y_test_sess(:,1:round(length(t_fine)*4/5));
+                resid_Y_temp = residual_matrix * Y_temp;
                 X_temp_pred = X_test_sess(:,round(length(t_fine)*4/5)+1:end);
                 Y_temp_pred = Y_test_sess(:,round(length(t_fine)*4/5)+1:end);
                 VY = V(1:num_DMs,:) * Y_temp;
-                C_temp(1,1) = sum(dot(Y_temp, Y_temp, 1));
+                C_temp(1,1) = sum(dot(resid_Y_temp, resid_Y_temp, 1));
                 for j=1:num_DMs
-                    C_temp(1,j+1) = sum(dot(U(:,j)'*Y_temp, VY(j,:), 1));
+                    C_temp(1,j+1) = sum(dot(U(:,j)'*resid_Y_temp, VY(j,:), 1));
                 end
                 C_temp(2:end,1) = C_temp(1,2:end)';
                 for i=1:num_DMs
@@ -238,51 +268,118 @@ for n_cv = 1:cv_num
                         C_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
                     end
                 end
-                B_temp(1) = sum(dot(Y_temp,X_temp,1));
+                B_temp(1) = sum(dot(resid_Y_temp,X_temp,1));
                 for k=1:num_DMs
                     B_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
                 end
 
                 % with autocorrelation term
                 D = C_temp\B_temp;
-                A_approx = D(1)*eye(size(X_temp,1));
-                for i = 1:num_DMs
-                    A_approx = A_approx + D(i+1) * U(:,i) * V(i,:);
-                end
+                A_approx = D(1)*residual_matrix;
+%                 for i = 1:num_DMs
+%                     A_approx = A_approx + D(i+1) * U(:,i) * V(i,:);
+%                 end
+                A_approx = A_approx + U(:,1:num_DMs) * diag(D(2:end)) * V(1:num_DMs,:);
                 A_approx = real(A_approx);
-                loss = sum((X_temp_pred - A_approx * Y_temp_pred).^2,'all');
-                
-                % without autocorrelation term
-                D2 = C_temp(2:end,2:end)\B_temp(2:end);
-                A_approx = zeros(size(X_temp,1));
-                for i = 1:num_DMs
-                    A_approx = A_approx + D2(i) * U(:,i) * V(i,:);
-                end
-                A_approx = real(A_approx);
-                loss2 = sum((X_temp_pred - A_approx * Y_temp_pred).^2,'all');
+                loss = sum((X_temp_pred - A_approx * Y_temp_pred).^2,2);
                 
                 % null model - only consider autocorrelation
-                a_null = real(B_temp(1)/C_temp(1));
-                loss_null = sum((X_temp_pred - a_null * Y_temp_pred).^2,'all');
+                c0 = sum(dot(Y_temp, Y_temp, 1));
+                b0 = sum(dot(Y_temp,X_temp,1));
+                a_null = real(b0/c0);
+                loss_null = sum((X_temp_pred - a_null * Y_temp_pred).^2,2);
+                
+                loss_zero = sum((X_temp_pred - Y_temp_pred).^2,2);
 
-                loss_session(n_ses) = loss/loss_null;
-                loss2_session(n_ses) = loss2/loss_null;
+                loss_session(n_ses) = mean(loss./loss_null);
+                denom = sum((X_temp_pred - mean(X_temp_pred,2)).^2,2);
+                R_squared_zero_session(n_ses) = 1-mean(loss_zero./denom);
+                R_squared_null_session(n_ses) = 1-mean(loss_null./denom);
+                R_squared_session(n_ses) = 1-mean(loss./denom);
             end
             
             loss_fold_current(n_test) = mean(loss_session);
-            loss2_fold_current(n_test) = mean(loss2_session);
+            R_squared_fold_zero_current(n_test) = mean(R_squared_zero_session);
+            R_squared_fold_null_current(n_test) = mean(R_squared_null_session);
+            R_squared_fold_current(n_test) = mean(R_squared_session);
             session_count(n_test) = num_session;
         end
         loss_fold_current(isnan(loss_fold_current)) = 0;
-        loss2_fold_current(isnan(loss2_fold_current)) = 0;
+        R_squared_fold_zero_current(isnan(R_squared_fold_zero_current)) = 0;
+        R_squared_fold_null_current(isnan(R_squared_fold_null_current)) = 0;
+        R_squared_fold_current(isnan(R_squared_fold_current)) = 0;
         loss_fold(n_cv,num_DMs/2) = sum(loss_fold_current.*session_count)/sum(session_count);
-        loss_fold(n_cv,max_DMs/2+num_DMs/2) = sum(loss2_fold_current.*session_count)/sum(session_count);
+        R_squared_zero_fold(n_cv,num_DMs/2) = sum(R_squared_fold_zero_current.*session_count)/sum(session_count);
+        R_squared_null_fold(n_cv,num_DMs/2) = sum(R_squared_fold_null_current.*session_count)/sum(session_count);
+        R_squared_fold(n_cv,num_DMs/2) = sum(R_squared_fold_current.*session_count)/sum(session_count);
+        disp(['The number of the included DM: ',num2str(num_DMs/2),', R_squared: ',num2str(R_squared_fold(n_cv,num_DMs/2),'%.6f'), ...
+            ', R_squared (zero): ',num2str(R_squared_zero_fold(n_cv,num_DMs/2),'%.6f'),...
+            ', R_squared (null): ',num2str(R_squared_null_fold(n_cv,num_DMs/2),'%.6f'),...
+            ', Loss ratio compared to null model: ',num2str(loss_fold(n_cv,num_DMs/2),'%.6f')])
         toc
     end
     disp('===== Fold Done ====');
 end
 
-figure; bar(mean(loss_fold)-min(mean(loss_fold)));
+figure; 
+subplot(2,1,1); bar(mean(R_squared_fold)-min(mean(R_squared_fold)));
+subplot(2,1,2); bar(mean(loss_fold)-min(mean(loss_fold)));
 
-save DMs/DM_cortical_subcortical_noROInorm_CV_prediction Phi_fold lambda_fold roi_exclude loss_fold
+save DMs/DM_cortical_subcortical_noROInorm_CV_prediction Phi_fold lambda_fold roi_exclude loss_fold R_squared_fold R_squared_zero_fold R_squared_null_fold
 
+%% For comparison purpose
+
+R_squared_fold_lasso = zeros(cv_num,1);
+for n_cv = 1:cv_num
+    disp(['=== CV prediction fold #',num2str(n_cv),'===']);
+    lambda = lambda_fold{n_cv};
+    Phi_sorted = Phi_fold{n_cv};
+    Phi_all = Phi_all_fold{n_cv};
+    
+    current_train_subjects = train_id_list{n_cv};
+    current_test_subjects = test_id_list{n_cv};
+    R_squared_fold_current = zeros(1,length(current_test_subjects));
+    for n_test = 1:length(current_test_subjects)
+        current_subject = current_test_subjects(n_test);
+        is_test = data_index_sub == current_subject;
+        num_session = round(sum(is_test)/(length(t_fine)-1));
+        X_test = X(:,is_test);
+        Y_test = Y(:,is_test);
+        R_squared_session = zeros(1,num_session);
+        for n_ses = 1:num_session
+            X_test_sess = X_test(:,(n_ses-1)*(length(t_fine)-1)+1:n_ses*(length(t_fine)-1));
+            Y_test_sess = Y_test(:,(n_ses-1)*(length(t_fine)-1)+1:n_ses*(length(t_fine)-1));
+
+            X_temp = X_test_sess(:,1:round(length(t_fine)*4/5));
+            Y_temp = Y_test_sess(:,1:round(length(t_fine)*4/5));
+            X_temp_pred = X_test_sess(:,round(length(t_fine)*4/5)+1:end);
+            Y_temp_pred = Y_test_sess(:,round(length(t_fine)*4/5)+1:end);
+            
+            Y_temp_diff = X_temp - Y_temp;
+            
+            % Initialize Theta for multiple response variables
+            [num_responses, ~] = size(Y_temp_diff);
+            Theta = zeros(num_responses, size(Y_temp, 1));
+            
+            % Perform Lasso regression for each response variable
+            parfor i = 1:num_responses
+                % Transpose data to match lasso's expected input
+                [B, fitinfo] = lasso(Y_temp', Y_temp_diff(i, :)', 'lambda', linspace(10,100,20), 'CV',4, 'Standardize', true);
+                % If multiple coefficients are returned, select the one corresponding to lambda
+                Theta(i, :) = B(:, fitinfo.IndexMinMSE)';  % Assuming lambda is a scalar
+            end
+            
+            W = (eye(size(Theta)) + Theta) ;
+            Y_hat = W  * Y_temp_pred;
+            loss = sum((X_temp_pred - Y_hat).^2,2);
+            denom = sum((X_temp_pred - mean(X_temp_pred,2)).^2,2);
+            R_squared_session(n_ses) = 1-mean(loss./denom);
+        end
+        R_squared_fold_current(n_test) = mean(R_squared_session);
+    end
+    R_squared_fold_current(isnan(R_squared_fold_current)) = 0;
+    R_squared_fold_lasso(n_cv) = sum(R_squared_fold_current.*session_count)/sum(session_count);
+    disp(['R_squared: ',num2str(R_squared_fold_lasso(n_cv),'%.6f')])
+end
+
+save results/other_model_cv_results R_squared_fold_lasso

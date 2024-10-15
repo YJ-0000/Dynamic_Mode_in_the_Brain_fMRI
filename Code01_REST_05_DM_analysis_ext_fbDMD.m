@@ -87,13 +87,15 @@ toc
 lambda = diag(D);
 idx_exclude = (abs(angle(lambda)) < 2*pi*1.5*0.01) | (abs(lambda)>1);
 lambda(idx_exclude) = [];
+Phi_rest = Phi_sorted(:,idx_exclude);
 Phi_sorted(:,idx_exclude) = [];
 [lambda,idx_sort] = sort(lambda,'descend');
 Phi_sorted = Phi_sorted(:,idx_sort);
+Phi_all = [Phi_sorted,Phi_rest];
     
 
 %%
-save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm Phi_sorted lambda A roi_exclude
+save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm Phi_sorted lambda A roi_exclude Phi_all
 
 %%
 cd(current_path);
@@ -113,7 +115,7 @@ save_dir = [pwd filesep 'DM_video_HCP_REST_fbDMD'];
 
 frame_dt = 0.5;
 
-for pair_num = 1:9
+for pair_num = 3
     
     cd(save_dir);
     mkdir(['DM_pair', num2str(pair_num) '_4view']);
@@ -127,7 +129,7 @@ for pair_num = 1:9
     lambda_conjugate1 = lambda(DM_conjugate1_num);
     lambda_conjugate2 = lambda(DM_conjugate2_num);
     
-    for frame = 0:1:100
+    for frame = 41:1:100
         eigenstate = zeros(size(atlasimage));
         for roi=1:N 
             eigenstate(atlasimage==label_idx_list(roi))= real((lambda_conjugate1^(frame*frame_dt/TRtarget))*Phi_sorted(roi,DM_conjugate1_num) + (lambda_conjugate2^(frame*frame_dt/TRtarget))*Phi_sorted(roi,DM_conjugate2_num));
@@ -140,7 +142,8 @@ for pair_num = 1:9
         fh('colormap','bluewhitered');
         fh('colorbar','on');
 %         fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num)))/3,max(abs(Phi_sorted(:,DM_conjugate1_num)))/3]);
-        fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num))),max(abs(Phi_sorted(:,DM_conjugate1_num)))]);
+        fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num)))/2,max(abs(Phi_sorted(:,DM_conjugate1_num)))/2]);
+%         fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num))),max(abs(Phi_sorted(:,DM_conjugate1_num)))]);
         fh('print',4,['DM_pair', num2str(pair_num), '_', num2str(frame,'%04d'),'.jpg'],'-r150','-nogui') 
         
         close;
@@ -193,11 +196,11 @@ end
 %% individual fitting (based on optDMD)
 cd(current_path);
 
-num_DMs = 18;
+num_DMs = 10;
 
 U=Phi_sorted(:,1:num_DMs);
-
 V=pinv(U);
+residual_matrix = eye(size(U,1)) - U*V;
 D=zeros(num_DMs+1,length(tau));
 for n=1:length(tau)
     if tau(n) == 0
@@ -212,10 +215,11 @@ for n=1:length(tau)
     tau_n = sum(tau(1:n-1));
     X_temp = X(:,tau_n+1:tau_n+tau(n));
     Y_temp = Y(:,tau_n+1:tau_n+tau(n));
+    resid_Y_temp = residual_matrix * Y_temp;
     VY = V(1:num_DMs,:) * Y_temp;
-    C_temp(1,1) = sum(dot(Y_temp, Y_temp, 1));
+    C_temp(1,1) = sum(dot(resid_Y_temp, resid_Y_temp, 1));
     for j=1:num_DMs
-        C_temp(1,j+1) = sum(dot(U(:,j)'*Y_temp, VY(j,:), 1));
+        C_temp(1,j+1) = sum(dot(U(:,j)'*resid_Y_temp, VY(j,:), 1));
     end
     C_temp(2:end,1) = C_temp(1,2:end)';
     for i=1:num_DMs
@@ -223,7 +227,7 @@ for n=1:length(tau)
             C_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
         end
     end
-    B_temp(1) = sum(dot(Y_temp,X_temp,1));
+    B_temp(1) = sum(dot(resid_Y_temp,X_temp,1));
     for k=1:num_DMs
         B_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
     end
@@ -233,5 +237,5 @@ for n=1:length(tau)
     disp(['end: sub#' num2str(n)]);
 end
 
-save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_18 tau Phi_sorted lambda D sub_ids num_DMs
+save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10 tau Phi_sorted lambda D sub_ids num_DMs
 
