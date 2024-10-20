@@ -8,7 +8,7 @@ len_time_list = [405,176,284,316,253,274,232];
 for n_task = 1:length(task_names)
     current_task = task_names{n_task};
     disp(current_task);
-    load(['results/HCP_timeseries_tfMRI_',current_task,'_cortical_subcortical_extracted_filtered_CompCor_meta.mat']);
+    load(['results/HCP_timeseries_tfMRI_',current_task,'_cortical_subcortical_extracted_meta.mat']);
     task_input = cell(length(sub_ids),2);
     for nsub = 1:length(sub_ids)
         disp(nsub);
@@ -30,31 +30,39 @@ for n_task = 1:length(task_names)
             
                 switch current_task
                     case 'WM'
-                        WM_items = {'body','faces','places','tools'};
-                        onset_0bk = zeros(length(WM_items),1);
-                        duration_0bk = zeros(length(WM_items),1);
-                        for n_item = 1:length(WM_items)
-                            task_info = readtable(['0bk_',WM_items{n_item},'.txt'], "FileType","text",'Delimiter', '\t');
-                            onset_0bk(n_item) = task_info(1,1).Variables;
-                            duration_0bk(n_item) = task_info(1,2).Variables;
+%                         WM_items = {'body','faces','places','tools'};
+%                         onset_0bk = zeros(length(WM_items),1);
+%                         duration_0bk = zeros(length(WM_items),1);
+%                         for n_item = 1:length(WM_items)
+%                             task_info = readtable(['0bk_',WM_items{n_item},'.txt'], "FileType","text",'Delimiter', '\t');
+%                             onset_0bk(n_item) = task_info(1,1).Variables;
+%                             duration_0bk(n_item) = task_info(1,2).Variables;
+%                         end
+%                         [onset_0bk,idx_sort] = sort(onset_0bk);
+%                         duration_0bk = duration_0bk(idx_sort);
+%                         task_info_0bk = table(onset_0bk,duration_0bk);
+% 
+%                         onset_2bk = zeros(length(WM_items),1);
+%                         duration_2bk = zeros(length(WM_items),1);
+%                         for n_item = 1:length(WM_items)
+%                             task_info = readtable(['2bk_',WM_items{n_item},'.txt'], "FileType","text",'Delimiter', '\t');
+%                             onset_2bk(n_item) = task_info(1,1).Variables;
+%                             duration_2bk(n_item) = task_info(1,2).Variables;
+%                         end
+%                         [onset_2bk,idx_sort] = sort(onset_2bk);
+%                         duration_2bk = duration_2bk(idx_sort);
+%                         task_info_2bk = table(onset_2bk,duration_2bk);
+% 
+%                         trial_types = {'0bk','2bk'};
+%                         task_input{nsub,nses} = {task_info_0bk,task_info_2bk};
+                        
+                        trial_types = {'0bk_body','0bk_faces','0bk_places','0bk_tools','2bk_body','2bk_faces','2bk_places','2bk_tools'};
+                        temp_cell = cell(1,length(trial_types));
+                        for n_trial = 1:length(trial_types)
+                            task_info = readtable([trial_types{n_trial},'.txt'], "FileType","text",'Delimiter', '\t');
+                            temp_cell{n_trial} = task_info;
                         end
-                        [onset_0bk,idx_sort] = sort(onset_0bk);
-                        duration_0bk = duration_0bk(idx_sort);
-                        task_info_0bk = table(onset_0bk,duration_0bk);
-
-                        onset_2bk = zeros(length(WM_items),1);
-                        duration_2bk = zeros(length(WM_items),1);
-                        for n_item = 1:length(WM_items)
-                            task_info = readtable(['2bk_',WM_items{n_item},'.txt'], "FileType","text",'Delimiter', '\t');
-                            onset_2bk(n_item) = task_info(1,1).Variables;
-                            duration_2bk(n_item) = task_info(1,2).Variables;
-                        end
-                        [onset_2bk,idx_sort] = sort(onset_2bk);
-                        duration_2bk = duration_2bk(idx_sort);
-                        task_info_2bk = table(onset_2bk,duration_2bk);
-
-                        trial_types = {'0bk','2bk'};
-                        task_input{nsub,nses} = {task_info_0bk,task_info_2bk};
+                        task_input{nsub,nses} = temp_cell;
 
                     case 'EMOTION'
                         trial_types = {'fear','neut'};

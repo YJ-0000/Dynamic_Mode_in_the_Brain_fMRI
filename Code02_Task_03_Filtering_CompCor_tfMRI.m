@@ -6,19 +6,22 @@ for n_task = 1:length(task_names)
     
     load(['results/HCP_timeseries_tfMRI_',current_task,'_cortical_subcortical_extracted_meta.mat']);
     load(['results/HCP_timeseries_tfMRI_',current_task,'_cortical_subcortical_extracted.mat']);
+    load(['results/HCP_timeseries_tfMRI_',current_task,'_cortical_subcortical_extracted_task_input']);
 
     %%
     % Define the sampling frequency
     Fs = 1/0.72;  % Hz
+    t_sample = 0.72;
 
     % Define the frequency range for the band-pass filter
     lowCutoff = 0.01;  % Hz
     highCutoff = 0.1;  % Hz
 
 
-    x = time_series_preproc{1,1};
+%     x = time_series_preproc{1,1};
     % Apply the filter
-    filteredData = bandpass(x(1,:),[lowCutoff, highCutoff],Fs);
+%     filteredData = bandpass(x(1,:),[lowCutoff, highCutoff],Fs);
+%     filteredData = 
 
     %%
     time_series_preproc_filtered = cell(size(time_series_preproc));
@@ -28,14 +31,25 @@ for n_task = 1:length(task_names)
         for nses = 1:2
             disp([nsub,nses]);
             data_mat = time_series_preproc{nsub,nses};
-            noise_mat = [noise_regressors{nsub,nses},X];
+            task_info = task_input{nsub,nses};
+            task_mat = [];
+            M = length(task_info);
+            for m = 1:M
+                task_info1 = task_info{m};
+                if ~isempty(task_info1)
+                    onset_1= task_info1(:,1).Variables';
+                    duration_1 = task_info1(:,2).Variables';
+                    convolved_regressor1 = createTaskRegressor(t_sample, size(data_mat,2)*t_sample, onset_1, duration_1, 30);
+                    task_mat = [task_mat,convolved_regressor1'];
+                end
+            end
+            noise_mat = [noise_regressors{nsub,nses},X,task_mat];
             if ~isempty(data_mat)
                 for n_roi = 1:N
                     % apply residual matrix
-                    data_mat(n_roi,:) = data_mat(n_roi,:)' - noise_mat*(noise_mat\data_mat(n_roi,:)');
+                    data_mat(n_roi,:) = data_mat(n_roi,:)' - noise_mat*(pinv(noise_mat)*data_mat(n_roi,:)');
                     % bandpass filter
-                    data_mat(n_roi,:) = ...
-                        bandpass(data_mat(n_roi,:),[lowCutoff, highCutoff],Fs);
+                    data_mat(n_roi,:) = highpass(data_mat(n_roi,:),lowCutoff,Fs);
                 end
                 time_series_preproc_filtered{nsub,nses} = data_mat;
             end
