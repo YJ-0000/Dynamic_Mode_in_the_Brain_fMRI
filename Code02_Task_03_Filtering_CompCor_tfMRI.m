@@ -17,12 +17,6 @@ for n_task = 1:length(task_names)
     lowCutoff = 0.01;  % Hz
     highCutoff = 0.1;  % Hz
 
-
-%     x = time_series_preproc{1,1};
-    % Apply the filter
-%     filteredData = bandpass(x(1,:),[lowCutoff, highCutoff],Fs);
-%     filteredData = 
-
     %%
     time_series_preproc_filtered = cell(size(time_series_preproc));
     X = [ones(len_time,1), (1:len_time)',((1:len_time).^2)'];
@@ -45,13 +39,11 @@ for n_task = 1:length(task_names)
             end
             noise_mat = [noise_regressors{nsub,nses},X,task_mat];
             if ~isempty(data_mat)
-                for n_roi = 1:N
-                    % apply residual matrix
-                    data_mat(n_roi,:) = data_mat(n_roi,:)' - noise_mat*(pinv(noise_mat)*data_mat(n_roi,:)');
-                    % bandpass filter
-                    data_mat(n_roi,:) = highpass(data_mat(n_roi,:),lowCutoff,Fs);
-                end
-                time_series_preproc_filtered{nsub,nses} = data_mat;
+                % apply residual matrix
+                data_mat2 = (data_mat' - noise_mat*pinv(noise_mat)*(data_mat'));
+                % bandpass filter
+                data_mat2 = highpass(data_mat2, lowCutoff, Fs)';
+                time_series_preproc_filtered{nsub,nses} = data_mat2;
             end
         end
     end
