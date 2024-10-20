@@ -42,7 +42,8 @@ for n_task = 1:length(task_names)
                 % apply residual matrix
                 data_mat2 = (data_mat' - noise_mat*pinv(noise_mat)*(data_mat'));
                 % bandpass filter
-                data_mat2 = highpass(data_mat2, lowCutoff, Fs)';
+%                 data_mat2 = highpass(data_mat2, lowCutoff, Fs)';
+                data_mat2 = bandpass(data_mat2, [lowCutoff,highCutoff], Fs)';
                 time_series_preproc_filtered{nsub,nses} = data_mat2;
             end
         end
