@@ -39,14 +39,16 @@ for i = 1:num_tasks
     sub_ids_tasks{i} = sub_ids_tasks{i}(idx_task);
 end
 %% coefficients
+idx_order = [1,5,9,7,3];
+
 figure; 
 subplot(2,4,1);
-bar(mean(abs(D_rest([1,5,9,7,3],:)),2));
+bar(mean(abs(D_rest(idx_order,:)),2));
 title('REST');
 ylim([0.94,1]);
 for ii = 1:7
     subplot(2,4,ii+1);
-    bar(mean(abs(D_tasks{ii}([1,5,9,7,3],:)),2));
+    bar(mean(abs(D_tasks{ii}(idx_order,:)),2));
     title(task_names{ii});
     ylim([0.94,1]);
 end
@@ -60,16 +62,16 @@ end
 % end
 
 if strcmp(test_for,'magnitude')
-    normalized_D_rest = abs(D_rest(1:2:end,:)) ;
+    normalized_D_rest = abs(D_rest(idx_order,:)) ;
     normalized_D_tasks = cell(1, num_tasks);
     for i = 1:num_tasks
-        normalized_D_tasks{i} = abs(D_tasks{i}(1:2:end,:)) ;
+        normalized_D_tasks{i} = abs(D_tasks{i}(idx_order,:)) ;
     end
 elseif strcmp(test_for,'phase')
-    normalized_D_rest = angle(D_rest(1:2:end,:));
+    normalized_D_rest = angle(D_rest(idx_order,:));
     normalized_D_tasks = cell(1, num_tasks);
     for i = 1:num_tasks
-        normalized_D_tasks{i} = angle(D_tasks{i}(1:2:end,:));
+        normalized_D_tasks{i} = angle(D_tasks{i}(idx_order,:));
     end
 else
     error('Magnitude or phase??')
@@ -162,11 +164,12 @@ redWhiteBlue = [cmap1; cmap2];
 % Rest vs Tasks Heatmap
 figure;
 % Create t-value heatmap
-imagesc(t_stats_rest_vs_tasks);
+imagesc(-t_stats_rest_vs_tasks);
 colormap(redWhiteBlue);
 colorbar;
+mode_names = {'Principal','CEN-to-DMN','DMN-to-CEN','Bi-asym','FV-to-S'};
 caxis([-max(abs(t_stats_rest_vs_tasks(:))), max(abs(t_stats_rest_vs_tasks(:)))]);
-set(gca, 'XTick', 1:num_tasks, 'XTickLabel', task_names, 'YTick', 1:n_modes);
+set(gca, 'XTick', 1:num_tasks, 'XTickLabel', task_names, 'YTick', 1:n_modes,'YTickLabel', mode_names);
 % xlabel('Tasks');
 % ylabel('Modes');
 title('T-values: Rest vs Tasks');
