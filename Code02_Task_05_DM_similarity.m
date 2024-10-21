@@ -6,7 +6,8 @@ D_rest = D(2:end, tau ~= 0).^(0.72/1.5);
 sub_ids_rest = sub_ids(tau ~= 0);
 
 % List of task files and names
-task_names = {'WM','EMOTION','MOTOR','LANGUAGE','GAMBLING','SOCIAL','RELATIONAL'};
+% task_names = {'WM','EMOTION','MOTOR','LANGUAGE','GAMBLING','SOCIAL','RELATIONAL'};
+task_names = {'EMOTION','GAMBLING','LANGUAGE','MOTOR','RELATIONAL','SOCIAL','WM'};
 num_tasks = length(task_names);
 D_tasks = cell(1, num_tasks);
 sub_ids_tasks = cell(1, num_tasks);
@@ -111,6 +112,8 @@ mean_cosine_sim_mag_tasks = squeeze(mean(cosine_sim_mag_tasks, 1));
 % Mean Cosine Similarity for Phases
 mean_cosine_sim_phase_rest_tasks = mean(cosine_sim_phase_rest_tasks, 1);
 mean_cosine_sim_phase_tasks = squeeze(mean(cosine_sim_phase_tasks, 1));
+
+task_names = {'Emotional','Gambling','Language','Motor','Relational','Social','N-back'};
 
 % Display Mean Cosine Similarity Between Magnitudes
 fprintf('Mean Cosine Similarity between Magnitudes of Rest and Tasks:\n');

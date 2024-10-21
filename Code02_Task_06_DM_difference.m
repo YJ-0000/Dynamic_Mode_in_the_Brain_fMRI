@@ -9,7 +9,8 @@ D_rest = D(2:end, tau ~= 0).^(0.72/1.5);
 sub_ids_rest = sub_ids(tau ~= 0);
 
 % List of task files and names
-task_names = {'WM','EMOTION','MOTOR','LANGUAGE','GAMBLING','SOCIAL','RELATIONAL'};
+% task_names = {'WM','EMOTION','MOTOR','LANGUAGE','GAMBLING','SOCIAL','RELATIONAL'};
+task_names = {'EMOTION','GAMBLING','LANGUAGE','MOTOR','RELATIONAL','SOCIAL','WM'};
 num_tasks = length(task_names);
 D_tasks = cell(1, num_tasks);
 sub_ids_tasks = cell(1, num_tasks);
@@ -147,6 +148,8 @@ p_values_tasks_vs_tasks_bonf(p_values_tasks_vs_tasks_bonf > 1) = 1;
 p_values_tasks_vs_tasks_bonf(p_values_tasks_vs_tasks_bonf == 0) = NaN;
 
 %% Visualization using heatmap
+task_names = {'Emotional','Gambling','Language','Motor','Relational','Social','N-back'};
+
 alpha = 0.05; % Significance level
 
 n = 256; % Number of colors
