@@ -1,6 +1,6 @@
 clear; clc;
 
-load DMs/DM_ADNI_cortical_subcortical_noROInorm_indiv_10
+load DMs/DM_MDD_cortical_subcortical_noROInorm_indiv_10
 
 %% stack D
 abs_all_D = [abs(D_list{1}(2:2:end,:)),...
