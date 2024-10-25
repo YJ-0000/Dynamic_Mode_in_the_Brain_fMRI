@@ -1,25 +1,32 @@
-clear;clc;
+% clear;clc;
 
 %%
-load DMs/DM_cortical_subcortical_SVD_noROInorm
+load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm
 load results/ABIDE_timeseires_cortical_subcortical_CPAC_denoised_filtered
 
 siteList={'CALTECH','CMU','KKI','MAXMUN','NYU','OLIN','OHSU','SDSU','SBL','STANFORD','TRINITY','UCLA','LEUVEN','UM','PITT','USM','YALE'};
 TRlist=[2000 2000 2500 3000 2000 1500 2500 2000 2200 2000 2000 3000 1656 2000 1500 2000 2000];
 %% individual fitting
 TRtarget = 1.5;
+thres = 1;
 
-idx_exclude = abs(angle(lambda)) < 1e-10;
-lambda(idx_exclude) = [];
-Phi_sorted(:,idx_exclude) = [];
-
-max_number_eigenstates = 12;
-U=Phi_sorted;
-U=U(1:360,:);
-% U(:,[9,10,11,12,17,18]) = U(:,[11,12,17,18,9,10]);
-U(:,[11,12,17,18]) = U(:,[17,18,11,12]);
+num_DMs = 10;
+U=Phi_sorted(:,1:num_DMs);
+count_roi = zeros(size(U,1),1);
+for n=1:length(time_series_denoised_filtered)
+    if isempty(time_series_denoised_filtered{n}) 
+        continue;
+    end
+    y = time_series_denoised_filtered{n};
+    y(roi_exclude,:) = [];
+    var_y = var(y,0,2);
+    count_roi = count_roi + (var_y<0.0001);
+end
+U(count_roi>thres,:)=[];
 V=pinv(U);
-D=zeros(max_number_eigenstates,length(time_series_denoised_filtered));
+residual_matrix = eye(size(U,1)) - U(:,1:num_DMs)*V(1:num_DMs,:);
+% V(:,count_roi>thres) = [];
+D=zeros(num_DMs+1,length(time_series_denoised_filtered));
 idx_exclude = false(1,length(time_series_denoised_filtered));
 for n=1:length(time_series_denoised_filtered)
     if isempty(time_series_denoised_filtered{n}) 
@@ -28,8 +35,8 @@ for n=1:length(time_series_denoised_filtered)
     end
     
     disp(['start: sub#' num2str(n)]);
-    C_temp = zeros(max_number_eigenstates,max_number_eigenstates);
-    B_temp = zeros(max_number_eigenstates,1);
+    C_temp = zeros(num_DMs+1,num_DMs+1);
+    B_temp = zeros(num_DMs+1,1);
     
     tic
     
@@ -39,7 +46,9 @@ for n=1:length(time_series_denoised_filtered)
     end
     
     y = time_series_denoised_filtered{n};
-    y = y(1:360,:);
+%     y = y(1:360,:);
+    y(roi_exclude,:) = [];
+    y(count_roi>thres,:)=[];
     t = (1:size(y,2)) * (TRlist(index)/1000);
     t_fine = TRtarget:TRtarget:t(end);
     if TRlist(index)/1000 ~= TRtarget
@@ -51,22 +60,30 @@ for n=1:length(time_series_denoised_filtered)
     
     X_temp = y_fine(:,2:end);
     Y_temp = y_fine(:,1:end-1);
-    VY = V(1:max_number_eigenstates,:) * Y_temp;
-    for i=1:max_number_eigenstates
-        for j=1:max_number_eigenstates  
-            C_temp(i,j) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
+    resid_Y_temp = residual_matrix * Y_temp;
+    VY = V(1:num_DMs,:) * Y_temp;
+    C_temp(1,1) = sum(dot(resid_Y_temp, resid_Y_temp, 1));
+    for j=1:num_DMs
+        C_temp(1,j+1) = sum(dot(U(:,j)'*resid_Y_temp, VY(j,:), 1));
+    end
+    C_temp(2:end,1) = C_temp(1,2:end)';
+    for i=1:num_DMs
+        for j=1:num_DMs  
+            C_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
         end
     end
-    for k=1:max_number_eigenstates
-        B_temp(k) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
+    B_temp(1) = sum(dot(resid_Y_temp,X_temp,1));
+    for k=1:num_DMs
+        B_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
     end
     toc
 
     D(:,n) = C_temp\B_temp;
+%     D(:,n) = C_temp(2:end,2:end)\B_temp(2:end);
     disp(['end: sub#' num2str(n)]);
 end
 %%
 D(:,idx_exclude) = [];
 image_file_list(idx_exclude) = [];
 
-save DMs/DM_ABIDE_cortical_subcortical_SVD_noROInorm_indiv_12 D image_file_list Phi_sorted lambda idx_exclude
+save DMs/DM_ABIDE_cortical_subcortical_noROInorm_indiv_10 D image_file_list Phi_sorted lambda idx_exclude

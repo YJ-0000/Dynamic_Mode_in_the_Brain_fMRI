@@ -1,5 +1,7 @@
-clear;
-load DMs/DM_ABIDE_cortical_subcortical_SVD_noROInorm_indiv_12
+% clear;
+load DMs/DM_ABIDE_cortical_subcortical_noROInorm_indiv_10
+
+D(1,:) = [];
 
 % ASD<->TD
 % Age->ASD,TD
@@ -56,20 +58,20 @@ X=[x_group_residual,X_prime];
 
 %%
 % permutation test on the first t-value
-observed_tlist=zeros(size(D,1)*2,1);
-observed_plist=zeros(size(D,1)*2,1);
-Y = [abs(D)', angle(D)'];
+Y = [abs(D)',angle(D)'];
+observed_tlist=zeros(size(Y,2),1);
+observed_plist=zeros(size(Y,2),1);
 for eig=1:size(Y,2)
     y = Y(:,eig);
     [~,~,stats]=glmfit([x_group,X_prime],y,'normal','constant','off');
     observed_tlist(eig)=stats.t(1); % only the 1st t-value is meaningful
     observed_plist(eig)=stats.p(1); % only the 1st t-value is meaningful
 end
-
+%%
 nperm=10000;
 perm_tlist=zeros(nperm,1);
 parfor p=1:nperm
-    perm_temp=zeros(size(D,1)*2,1);
+    perm_temp=zeros(size(Y,2),1);
     Xperm=[X(randperm(size(X,1)),1),X_prime];
     for eig=1:size(Y,2)
         y = Y(:,eig);
