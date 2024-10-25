@@ -120,9 +120,9 @@ disp('########### F-test ###########')
 %%% test magnitude
 for n_dm = 1:5
     [F,p_val] = F_test_GLM([X,confound_regressors],y_abs(:,n_dm),[c_AD_minus_MCI,c_MCI_minus_CN]);
-    fprintf('DM #%d (magnitude) -- F-value for AD vs MCI vs CN: T=%.4f, p=%.4f\n', n_dm, F,p_val);
+    fprintf('DM #%d (magnitude) -- F-value for AD vs MCI vs CN: F=%.4f, p=%.4f\n', n_dm, F,p_val);
     [F,p_val] = F_test_GLM([X,confound_regressors],y_angle(:,n_dm),[c_AD_minus_MCI,c_MCI_minus_CN]);
-    fprintf('DM #%d (phase) -- F-value for AD vs MCI vs CN: T=%.4f, p=%.4f\n', n_dm, F,p_val);
+    fprintf('DM #%d (phase) -- F-value for AD vs MCI vs CN: F=%.4f, p=%.4f\n', n_dm, F,p_val);
 end
 
 %% statistical function
