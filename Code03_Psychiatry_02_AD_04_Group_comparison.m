@@ -51,6 +51,7 @@ func_manu_types = unique(all_func_manu);
 %%
 func_seq_regressor = zeros(num_all_sub,length(func_seq_types));
 func_manu_regressor = zeros(num_all_sub,length(func_manu_types));
+tr_regressor = zeros(num_all_sub,1);
 n_accum_sub = 0;
 for ndir = 1:length(sub_list)
     temp_sub_list = sub_list{ndir};
@@ -70,10 +71,19 @@ for ndir = 1:length(sub_list)
         manu_idx = find(strcmp(func_manu_types,manu_name));
         func_manu_regressor(n_accum_sub,manu_idx) = 1;
         
+        tr_regressor(n_accum_sub) = sub_info(sub_idx,'func_TR').Variables;
+        
         
 %         fprintf('Done.\n');
     end
 end
+
+is_slice_timing_corrected = [ones(size(D_list{1},2),1);
+                            zeros(size(D_list{2},2),1);
+                            ones(size(D_list{3},2),1);
+                            zeros(size(D_list{4},2),1);
+                            ones(size(D_list{5},2),1);
+                            zeros(size(D_list{6},2),1);];
 %% T-test
 disp('########### T-test ###########')
 % Define explanatory variables
@@ -83,7 +93,7 @@ y_abs = abs_all_D;
 y_angle = angle_all_D;
 
 % Define confounding regressors (func_seq_regressor and func_manu_regressor)
-confound_regressors = [func_seq_regressor, func_manu_regressor];
+confound_regressors = [func_seq_regressor, func_manu_regressor,is_slice_timing_corrected,tr_regressor];
 
 % Define contrast vectors
 c_AD_minus_CN = zeros(size(X,2)+size(confound_regressors,2),1);
