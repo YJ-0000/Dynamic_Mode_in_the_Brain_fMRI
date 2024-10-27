@@ -340,6 +340,7 @@ for n_cv = 1:cv_num
     current_test_subjects = test_id_list{n_cv};
     R_squared_fold_current = zeros(1,length(current_test_subjects));
     for n_test = 1:length(current_test_subjects)
+        tic
         current_subject = current_test_subjects(n_test);
         is_test = data_index_sub == current_subject;
         num_session = round(sum(is_test)/(length(t_fine)-1));
@@ -358,24 +359,50 @@ for n_cv = 1:cv_num
             Y_temp_diff = X_temp - Y_temp;
             
             % Initialize Theta for multiple response variables
+            lambda_list =linspace(10,100,19);
             [num_responses, ~] = size(Y_temp_diff);
-            Theta = zeros(num_responses, size(Y_temp, 1));
+            Theta = zeros(num_responses, size(Y_temp, 1),length(lambda_list));
             
+            MSE_accum = zeros(length(lambda_list),1);
+            
+            n_inner_cv = 4;
             % Perform Lasso regression for each response variable
             parfor i = 1:num_responses
                 % Transpose data to match lasso's expected input
-                [B, fitinfo] = lasso(Y_temp', Y_temp_diff(i, :)', 'lambda', linspace(10,100,20), 'CV',4, 'Standardize', true);
+                [B, ~] = lasso(Y_temp(:,1:round(size(Y_temp,2)*(n_inner_cv-1)/n_inner_cv))', ...
+                    Y_temp_diff(i, 1:round(size(Y_temp,2)*(n_inner_cv-1)/n_inner_cv))', 'lambda', lambda_list, 'Standardize', true);
                 % If multiple coefficients are returned, select the one corresponding to lambda
-                Theta(i, :) = B(:, fitinfo.IndexMinMSE)';  % Assuming lambda is a scalar
+                Theta(i, :, :) = B;  % Assuming lambda is a scalar
+            end
+            for n_inner = 1:length(lambda_list)
+                W = (eye(size(Theta,1)) + squeeze(Theta(:,:,n_inner)));
+                Y_hat = W  * Y_temp(:,round(size(Y_temp,2)*(n_inner_cv-1)/n_inner_cv)+1:end);
+                loss = sum((X_temp(:,round(size(Y_temp,2)*(n_inner_cv-1)/n_inner_cv)+1:end) - Y_hat).^2,2);
+                denom = sum((X_temp(:,round(size(Y_temp,2)*(n_inner_cv-1)/n_inner_cv)+1:end) - mean(X_temp(:,round(size(Y_temp,2)*(n_inner_cv-1)/n_inner_cv)+1:end),2)).^2,2);
+                R_squared_temp = 1-mean(loss./denom);
+                MSE_accum(n_inner) = R_squared_temp;
+            end
+            [~,max_idx] = max(MSE_accum);
+            best_lambda = lambda_list(max_idx);
+            fprintf('Current best hyperpameter = %.f \n',best_lambda);
+            
+            Theta_best = zeros(num_responses, size(Y_temp, 1));
+            parfor i = 1:num_responses
+                % Transpose data to match lasso's expected input
+                [B, ~] = lasso(Y_temp', Y_temp_diff(i, :)', 'lambda', best_lambda, 'Standardize', true);
+                % If multiple coefficients are returned, select the one corresponding to lambda
+                Theta_best(i, :) = B;  % Assuming lambda is a scalar
             end
             
-            W = (eye(size(Theta)) + Theta) ;
+            W = (eye(size(Theta_best)) + Theta_best) ;
             Y_hat = W  * Y_temp_pred;
             loss = sum((X_temp_pred - Y_hat).^2,2);
             denom = sum((X_temp_pred - mean(X_temp_pred,2)).^2,2);
             R_squared_session(n_ses) = 1-mean(loss./denom);
         end
         R_squared_fold_current(n_test) = mean(R_squared_session);
+        disp(mean(R_squared_session));
+        toc
     end
     R_squared_fold_current(isnan(R_squared_fold_current)) = 0;
     R_squared_fold_lasso(n_cv) = sum(R_squared_fold_current.*session_count)/sum(session_count);
