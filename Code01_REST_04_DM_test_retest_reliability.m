@@ -22,8 +22,10 @@ num_DMs = 10;
 U=Phi_sorted(:,1:num_DMs);
 V=pinv(U);
 residual_matrix = eye(size(U,1)) - U*V;
-D1=zeros(num_DMs+1,size(time_series_denoised_filtered,1));
-D2=zeros(num_DMs+1,size(time_series_denoised_filtered,1));
+D1 = zeros(num_DMs+1,size(time_series_denoised_filtered,1));
+D2 = zeros(num_DMs+1,size(time_series_denoised_filtered,1));
+B1_mean = zeros(num_DMs,size(time_series_denoised_filtered,1));
+B2_mean = zeros(num_DMs,size(time_series_denoised_filtered,1));
 idx_exclude = false(1,size(time_series_denoised_filtered,1));
 for nsub = 1:size(time_series_denoised_filtered,1)
     tau_temp = 0;
@@ -89,8 +91,10 @@ for nsub = 1:size(time_series_denoised_filtered,1)
             end
             if n_part == 1
                 D1(:,nsub) = C_temp\B_temp;
+                B1_mean(:,nsub) = mean(abs(VY),2);
             else
                 D2(:,nsub) = C_temp\B_temp;
+                B2_mean(:,nsub) = mean(abs(VY),2);
             end
         end
     end
@@ -100,27 +104,51 @@ end
 
 D1(:,idx_exclude) = [];
 D2(:,idx_exclude) = [];
+B1_mean(:,idx_exclude) = [];
+B2_mean(:,idx_exclude) = [];
 sub_ids(idx_exclude) = [];
 
-save DMs/DMs_REST_test_retest_indiv_10 D1 D2 sub_ids
+save DMs/DMs_REST_test_retest_indiv_10 D1 D2 B1_mean B2_mean sub_ids
 
 %%
-rest_self_corr = zeros(1,num_DMs);
-rest_self_sig = zeros(1,num_DMs);
-% rest_self_ICC = zeros(1,10);
-for n_dm = 1:(num_DMs/2)+1
-    temp_D1 = D1(2*(n_dm-1)+1,:);
-    temp_D2 = D2(2*(n_dm-1)+1,:);
+rest_self_corr_D_mag = zeros(1,num_DMs/2);
+rest_self_corr_D_phase = zeros(1,num_DMs/2);
+rest_self_corr_B_mean = zeros(1,num_DMs/2);
+% rest_self_sig = zeros(1,num_DMs);
+rest_self_ICC_D_mag = zeros(1,num_DMs/2);
+rest_self_ICC_D_phase = zeros(1,num_DMs/2);
+rest_self_ICC_B_mean = zeros(1,num_DMs/2);
+for n_dm = 1:(num_DMs/2)
+    temp_D1 = D1(2*(n_dm),:);
+    temp_D2 = D2(2*(n_dm),:);
+    temp_B1 = B1_mean(2*(n_dm-1)+1,:);
+    temp_B2 = B2_mean(2*(n_dm-1)+1,:);
     
     [r,p] = corrcoef(abs(temp_D1),abs(temp_D2));
-    rest_self_corr(2*(n_dm-1)+1) = r(2);
-    rest_self_sig(2*(n_dm-1)+1) = p(2);
+    rest_self_corr_D_mag(n_dm) = r(2);
+%     rest_self_sig(2*(n_dm-1)+1) = p(2);
     [r,p] = corrcoef(angle(temp_D1),angle(temp_D2));
-    rest_self_corr(2*(n_dm)) = r(2);
-    rest_self_sig(2*(n_dm)) = p(2);
+    rest_self_corr_D_phase(n_dm) = r(2);
+%     rest_self_sig(2*(n_dm)) = p(2);
+    [r,p] = corrcoef(temp_B1,temp_B2);
+    rest_self_corr_B_mean(n_dm) = r(2);
     
-%     rest_self_ICC(2*(n_dm-1)+1) = computeICC(abs(temp_D1),abs(temp_D2));
-%     rest_self_ICC(2*(n_dm)) = computeICC(angle(temp_D1),angle(temp_D2));
+    rest_self_ICC_D_mag(n_dm) = computeICC(abs(temp_D1),abs(temp_D2));
+    rest_self_ICC_D_phase(n_dm) = computeICC(angle(temp_D1),angle(temp_D2));
+    rest_self_ICC_B_mean(n_dm) = computeICC(temp_B1,temp_B2);
 end
 figure; 
-heatmap(rest_self_corr);
+subplot(3,1,1);
+heatmap(rest_self_corr_D_mag);
+subplot(3,1,2);
+heatmap(rest_self_corr_D_phase);
+subplot(3,1,3);
+heatmap(rest_self_corr_B_mean);
+
+figure; 
+subplot(3,1,1);
+heatmap(rest_self_ICC_D_mag);
+subplot(3,1,2);
+heatmap(rest_self_ICC_D_phase);
+subplot(3,1,3);
+heatmap(rest_self_ICC_B_mean);
