@@ -2,13 +2,15 @@ clear; clc; close all;
 current_path = pwd;
 %%
 load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm
-load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10
+load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B
 
 [sub_ids,sorted_idx] = sort(sub_ids);
 D = D(:,sorted_idx);
+B = B(:,sorted_idx);
 
 D(1,:) = [];
 D(:,tau<2000) = [];
+B(:,tau<2000) = [];
 sub_ids(tau<2000) = [];
 % tau(tau<2000) = [];
 
@@ -42,6 +44,7 @@ gene_data_table = gene_data_table(nonEmptyIdx, :);
 behav_data_table = behav_data_table(nonEmptyIdx, :);
 freesurfer_data_table = freesurfer_data_table(nonEmptyIdx, :);
 D = D(:,nonEmptyIdx);
+B = B(:,nonEmptyIdx);
 
 age = gene_data_table.Age_in_Yrs;
 sex = strcmp(behav_data_table.Gender,'F');
@@ -80,6 +83,7 @@ nan_sub = sum(isnan(X),2)>0;
 X(nan_sub,:) = [];
 gene_data_table(nan_sub,:) = [];
 D(:,nan_sub) = [];
+B(:,nan_sub) = [];
 
 new_table = gene_data_table(:,[1,7,8,4]);
 new_table = renamevars(new_table, 'ZygositySR', 'Zygosity');
@@ -88,9 +92,11 @@ new_table = renamevars(new_table, 'ZygositySR', 'Zygosity');
 Y = [];
 abs_D = abs(D(1:2:end,:));
 angle_D = angle(D(1:2:end,:));
+BB = B(1:2:end,:);
 for ii = 1:size(abs_D,1)
 %     dd = abs_D(ii,:)';
-    dd = angle_D(ii,:)';
+%     dd = angle_D(ii,:)';
+    dd = BB(ii,:)';
     new_dd = dd - X * pinv(X) * dd;
     Y = [new_dd,Y];
 end
@@ -103,8 +109,10 @@ ACEfit_Par.P_nm      =  Y';
 ACEfit_Par.InfMx     = [current_path,'/data/zygosity.csv']; 
 % cd(current_path); mkdir('ACE_model_results_mag');
 % ACEfit_Par.ResDir    = './ACE_model_results_mag'; 
-cd(current_path); mkdir('ACE_model_results_angle');
-ACEfit_Par.ResDir    = './ACE_model_results_angle'; 
+% cd(current_path); mkdir('ACE_model_results_angle');
+% ACEfit_Par.ResDir    = './ACE_model_results_angle'; 
+cd(current_path); mkdir('ACE_model_results_B');
+ACEfit_Par.ResDir    = './ACE_model_results_B'; 
 ACEfit_Par.Subset    = [];
 ACEfit_Par.Pmask     = '';                % Brain mask image (default: 
                                           % whole volume)
