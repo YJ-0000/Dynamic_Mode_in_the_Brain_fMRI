@@ -74,4 +74,4 @@ for ndir = 1:length(AD_timeseries_extracted)
 end
 
 %%
-save results/AD_timeseires_cortical_subcortical_denoised_filtered sub_list AD_timeseries_extracted_denoised_filtered AD_sub_info
+save results/AD_timeseires_cortical_subcortical_denoised_filtered sub_list AD_timeseries_extracted_denoised_filtered AD_sub_info AD_TR_info

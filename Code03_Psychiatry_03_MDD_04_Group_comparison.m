@@ -7,9 +7,12 @@ abs_all_D = [abs(D_list{1}(2:2:end,:)),...
             abs(D_list{2}(2:2:end,:))];
 angle_all_D = [angle(D_list{1}(2:2:end,:)),...
             angle(D_list{2}(2:2:end,:))];
+abs_all_B = [(B_list{1}(2:2:end,:)),...
+            (B_list{2}(2:2:end,:))];
         
 abs_all_D = abs_all_D';
 angle_all_D = angle_all_D';
+abs_all_B = abs_all_B';
 %% make regressors
 num_all_sub = size(D_list{1},2)+size(D_list{2},2);
 is_MDD = [zeros(size(D_list{1},2),1);
@@ -56,9 +59,10 @@ X = [is_MDD,is_HC];
 % Define predictor variables (D)
 y_abs = abs_all_D;
 y_angle = angle_all_D;
+y_B = abs_all_B;
 
 % Define confounding regressors (func_seq_regressor and func_manu_regressor)
-confound_regressors = [site_regressor];
+confound_regressors = [sex_regressor, site_regressor];
 
 % Define contrast vectors
 c_MDD_minus_HC = zeros(size(X,2)+size(confound_regressors,2),1);
@@ -77,6 +81,12 @@ for n_dm = 1:5
 
     % Display T-values
     fprintf('DM #%d (phase) -- T-value for MDD-HC: T=%.4f, p=%.4f\n', n_dm, T_value_MDD_minus_HC,p_MDD_minus_HC);
+    
+    % Calculate T-value 
+    [T_value_MDD_minus_HC,p_MDD_minus_HC] = t_test_GLM([X,confound_regressors],y_B(:,n_dm),c_MDD_minus_HC);
+
+    % Display T-values
+    fprintf('DM #%d (Intensity) -- T-value for MDD-HC: T=%.4f, p=%.4f\n', n_dm, T_value_MDD_minus_HC,p_MDD_minus_HC);
 end
 %% F-test
 % disp('########### F-test ###########')

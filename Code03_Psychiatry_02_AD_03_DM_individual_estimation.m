@@ -26,6 +26,7 @@ V=pinv(U);
 residual_matrix = eye(size(U,1)) - U*V;
 
 D_list = cell(size(AD_timeseries_extracted_denoised_filtered));
+B_list = cell(size(AD_timeseries_extracted_denoised_filtered));
 for ndir = 1:length(AD_timeseries_extracted_denoised_filtered)
     sub_info = AD_sub_info{ndir};    
     temp_timeseries_extracted_denoised_filtered = AD_timeseries_extracted_denoised_filtered{ndir};
@@ -33,6 +34,7 @@ for ndir = 1:length(AD_timeseries_extracted_denoised_filtered)
     temp_sub_list = sub_list{ndir};
     
     D_temp = zeros(num_DMs+1,length(temp_timeseries_extracted_denoised_filtered));
+    B_temp = zeros(num_DMs,length(temp_timeseries_extracted_denoised_filtered));
     for nsub = 1:length(temp_timeseries_extracted_denoised_filtered)
         tr = temp_TR_info(nsub);
         sub_name = temp_sub_list{nsub};
@@ -40,8 +42,8 @@ for ndir = 1:length(AD_timeseries_extracted_denoised_filtered)
         
         
         y = temp_timeseries_extracted_denoised_filtered{nsub};
-        C_temp = zeros(num_DMs+1,num_DMs+1);
-        B_temp = zeros(num_DMs+1,1);
+        Z_temp = zeros(num_DMs+1,num_DMs+1);
+        W_temp = zeros(num_DMs+1,1);
 
         tic
         
@@ -60,27 +62,29 @@ for ndir = 1:length(AD_timeseries_extracted_denoised_filtered)
         Y_temp = y_fine(:,1:end-1);
         resid_Y_temp = residual_matrix * Y_temp;
         VY = V(1:num_DMs,:) * Y_temp;
-        C_temp(1,1) = sum(dot(resid_Y_temp, resid_Y_temp, 1));
+        Z_temp(1,1) = sum(dot(resid_Y_temp, resid_Y_temp, 1));
         for j=1:num_DMs
-            C_temp(1,j+1) = sum(dot(U(:,j)'*resid_Y_temp, VY(j,:), 1));
+            Z_temp(1,j+1) = sum(dot(U(:,j)'*resid_Y_temp, VY(j,:), 1));
         end
-        C_temp(2:end,1) = C_temp(1,2:end)';
+        Z_temp(2:end,1) = Z_temp(1,2:end)';
         for i=1:num_DMs
             for j=1:num_DMs  
-                C_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
+                Z_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
             end
         end
-        B_temp(1) = sum(dot(resid_Y_temp,X_temp,1));
+        W_temp(1) = sum(dot(resid_Y_temp,X_temp,1));
         for k=1:num_DMs
-            B_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
+            W_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
         end
         toc
 
-        D_temp(:,nsub) = C_temp\B_temp;
+        D_temp(:,nsub) = Z_temp\W_temp;
+        B_temp(:,nsub) = mean(abs(VY),2);
         
     end
     D_list{ndir} = D_temp;
+    B_list{ndir} = B_temp;
 end
 
 %%
-save DMs/DM_ADNI_cortical_subcortical_noROInorm_indiv_10 D_list Phi_sorted lambda count_roi thres sub_list AD_sub_info
+save DMs/DM_ADNI_cortical_subcortical_noROInorm_indiv_10 D_list B_list Phi_sorted lambda count_roi thres sub_list AD_sub_info

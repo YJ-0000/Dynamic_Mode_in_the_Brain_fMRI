@@ -58,7 +58,7 @@ X=[x_group_residual,X_prime];
 
 %%
 % permutation test on the first t-value
-Y = [abs(D)',angle(D)'];
+Y = [abs(D(1:2:end,:))',angle(D(1:2:end,:))',B(1:2:end,:)'];
 observed_tlist=zeros(size(Y,2),1);
 observed_plist=zeros(size(Y,2),1);
 for eig=1:size(Y,2)

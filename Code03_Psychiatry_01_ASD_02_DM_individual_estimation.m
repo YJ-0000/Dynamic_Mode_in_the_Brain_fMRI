@@ -27,6 +27,7 @@ V=pinv(U);
 residual_matrix = eye(size(U,1)) - U(:,1:num_DMs)*V(1:num_DMs,:);
 % V(:,count_roi>thres) = [];
 D=zeros(num_DMs+1,length(time_series_denoised_filtered));
+B=zeros(num_DMs,length(time_series_denoised_filtered));
 idx_exclude = false(1,length(time_series_denoised_filtered));
 for n=1:length(time_series_denoised_filtered)
     if isempty(time_series_denoised_filtered{n}) 
@@ -35,8 +36,8 @@ for n=1:length(time_series_denoised_filtered)
     end
     
     disp(['start: sub#' num2str(n)]);
-    C_temp = zeros(num_DMs+1,num_DMs+1);
-    B_temp = zeros(num_DMs+1,1);
+    Z_temp = zeros(num_DMs+1,num_DMs+1);
+    W_temp = zeros(num_DMs+1,1);
     
     tic
     
@@ -62,28 +63,30 @@ for n=1:length(time_series_denoised_filtered)
     Y_temp = y_fine(:,1:end-1);
     resid_Y_temp = residual_matrix * Y_temp;
     VY = V(1:num_DMs,:) * Y_temp;
-    C_temp(1,1) = sum(dot(resid_Y_temp, resid_Y_temp, 1));
+    Z_temp(1,1) = sum(dot(resid_Y_temp, resid_Y_temp, 1));
     for j=1:num_DMs
-        C_temp(1,j+1) = sum(dot(U(:,j)'*resid_Y_temp, VY(j,:), 1));
+        Z_temp(1,j+1) = sum(dot(U(:,j)'*resid_Y_temp, VY(j,:), 1));
     end
-    C_temp(2:end,1) = C_temp(1,2:end)';
+    Z_temp(2:end,1) = Z_temp(1,2:end)';
     for i=1:num_DMs
         for j=1:num_DMs  
-            C_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
+            Z_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
         end
     end
-    B_temp(1) = sum(dot(resid_Y_temp,X_temp,1));
+    W_temp(1) = sum(dot(resid_Y_temp,X_temp,1));
     for k=1:num_DMs
-        B_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
+        W_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
     end
     toc
 
-    D(:,n) = C_temp\B_temp;
+    D(:,n) = Z_temp\W_temp;
+    B(:,n) = mean(abs(VY),2);
 %     D(:,n) = C_temp(2:end,2:end)\B_temp(2:end);
     disp(['end: sub#' num2str(n)]);
 end
 %%
 D(:,idx_exclude) = [];
+B(:,idx_exclude) = [];
 image_file_list(idx_exclude) = [];
 
-save DMs/DM_ABIDE_cortical_subcortical_noROInorm_indiv_10 D image_file_list Phi_sorted lambda idx_exclude
+save DMs/DM_ABIDE_cortical_subcortical_noROInorm_indiv_10 D B image_file_list Phi_sorted lambda idx_exclude
