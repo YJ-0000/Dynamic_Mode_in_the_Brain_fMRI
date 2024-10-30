@@ -283,19 +283,29 @@ for n_cv = 1:cv_num
                 A_approx = real(A_approx);
                 loss = sum((X_temp_pred - A_approx * Y_temp_pred).^2,2);
                 
+                Y_test_plus_hat = A_approx  * Y_temp_pred;
+                E_test = X_temp_pred - Y_test_plus_hat;                                     % Prediction error
+                R2_DM = mean(1 - sum(E_test.^2, 2) ./ sum((X_temp_pred - mean(X_temp_pred, 2)).^2, 2));
+                
                 % null model - only consider autocorrelation
                 c0 = sum(dot(Y_temp, Y_temp, 1));
                 b0 = sum(dot(Y_temp,X_temp,1));
                 a_null = real(b0/c0);
                 loss_null = sum((X_temp_pred - a_null * Y_temp_pred).^2,2);
+                Y_test_plus_hat = a_null  * Y_temp_pred;
+                E_test = X_temp_pred - Y_test_plus_hat;                                     % Prediction error
+                R2_null = mean(1 - sum(E_test.^2, 2) ./ sum((X_temp_pred - mean(X_temp_pred, 2)).^2, 2));
                 
-                loss_zero = sum((X_temp_pred - Y_temp_pred).^2,2);
+%                 loss_zero = sum((X_temp_pred - Y_temp_pred).^2,2);
+
+                E_test = X_temp_pred - Y_temp_pred;                                     % Prediction error
+                R2_zero = mean(1 - sum(E_test.^2, 2) ./ sum((X_temp_pred - mean(X_temp_pred, 2)).^2, 2));
 
                 loss_session(n_ses) = mean(loss./loss_null);
                 denom = sum((X_temp_pred - mean(X_temp_pred,2)).^2,2);
-                R_squared_zero_session(n_ses) = 1-mean(loss_zero./denom);
-                R_squared_null_session(n_ses) = 1-mean(loss_null./denom);
-                R_squared_session(n_ses) = 1-mean(loss./denom);
+                R_squared_zero_session(n_ses) = R2_zero;
+                R_squared_null_session(n_ses) = R2_null;
+                R_squared_session(n_ses) = R2_DM;
             end
             
             loss_fold_current(n_test) = mean(loss_session);
@@ -327,18 +337,66 @@ subplot(2,1,2); bar(mean(loss_fold)-min(mean(loss_fold)));
 
 save DMs/DM_cortical_subcortical_noROInorm_CV_prediction Phi_fold lambda_fold roi_exclude loss_fold R_squared_fold R_squared_zero_fold R_squared_null_fold
 
-%% For comparison purpose
+%% LASSO (training-test)
+lambda_list =linspace(10,100,19);
+%%% training %%%
+R2_list_allsub_lambda = zeros(length(tau),length(lambda_list));
+for nsub = 1:length(tau)
+    disp(['=== (for training) sub-',num2str(nsub,'%04d'),' ===']);
+    is_current_sub = data_index_sub == nsub;
+    num_session = round(sum(is_current_sub)/(length(t_fine)-1));
+    Y_sub = Y(:,is_current_sub);
+    X_sub = X(:,is_current_sub);
+    tic
+    R2_list_ses_lambda = zeros(num_session,length(lambda_list));
+    for n_ses = 1:num_session
+        Y_sub_sess = Y_sub(:,(n_ses-1)*(length(t_fine)-1)+1:n_ses*(length(t_fine)-1));
+        X_sub_sess = X_sub(:,(n_ses-1)*(length(t_fine)-1)+1:n_ses*(length(t_fine)-1));
+        
+        n_inner_cv = 5;
+        Y_fitting = Y_sub_sess(:,1:round(size(Y_sub_sess,2)*(n_inner_cv-1)/n_inner_cv));
+        X_fitting = X_sub_sess(:,1:round(size(Y_sub_sess,2)*(n_inner_cv-1)/n_inner_cv));
+        Y_validation = Y_sub_sess(:,round(size(Y_sub_sess,2)*(n_inner_cv-1)/n_inner_cv)+1:end);
+        X_validation = X_sub_sess(:,round(size(Y_sub_sess,2)*(n_inner_cv-1)/n_inner_cv)+1:end);
+        
+        R2_list_lambda = linear_LASSO_yj_training(Y_fitting,X_fitting,Y_validation,X_validation,lambda_list);
+        [best_R2,best_idx] = max(R2_list_lambda);
+        fprintf('Current best h = %.3f, best R2 = %.6f \n', lambda_list(best_idx), best_R2);
+        R2_list_ses_lambda(n_ses,:) = R2_list_lambda;
+    end
+    toc
+    R2_list_allsub_lambda(nsub,:) = mean(R2_list_ses_lambda);
+end
 
-R_squared_fold_lasso = zeros(cv_num,1);
+save results/LASSO_training_temp R2_list_allsub_lambda lambda_list
+
+%%% test %%%
+R_squared_fold_LASSO = zeros(cv_num,1);
 for n_cv = 1:cv_num
     disp(['=== CV prediction fold #',num2str(n_cv),'===']);
     lambda = lambda_fold{n_cv};
-    Phi_sorted = Phi_fold{n_cv};
-    Phi_all = Phi_all_fold{n_cv};
     
     current_train_subjects = train_id_list{n_cv};
     current_test_subjects = test_id_list{n_cv};
+    
+    temp_R2_lambda_list = R2_list_allsub_lambda(current_train_subjects,:);
+    temp_tau = tau(current_train_subjects);
+    temp_R2_lambda_list(temp_tau==0,:) = [];
+    temp_lambda_list = lambda_list;
+    
+    temp_lambda_list(1) = [];
+    temp_R2_lambda_list(:,1) = [];
+    
+    mean_temp_R2_lambda_list = mean(temp_R2_lambda_list);
+    lambda_fine = temp_lambda_list(1):0.001:temp_lambda_list(end);
+    mean_temp_R2_lambda_fine = spline(temp_lambda_list,mean_temp_R2_lambda_list,lambda_fine);
+    
+    [~,idx_max] = max(mean_temp_R2_lambda_fine);
+    lambda_max_training = lambda_fine(idx_max);
+    fprintf('Hyperparameter lambda of current fold: %.3f\n',lambda_max_training);
+    
     R_squared_fold_current = zeros(1,length(current_test_subjects));
+    session_count = zeros(1,length(current_test_subjects));
     for n_test = 1:length(current_test_subjects)
         tic
         current_subject = current_test_subjects(n_test);
@@ -356,57 +414,118 @@ for n_cv = 1:cv_num
             X_temp_pred = X_test_sess(:,round(length(t_fine)*4/5)+1:end);
             Y_temp_pred = Y_test_sess(:,round(length(t_fine)*4/5)+1:end);
             
-            Y_temp_diff = X_temp - Y_temp;
-            
-            % Initialize Theta for multiple response variables
-            lambda_list =linspace(10,100,19);
-            [num_responses, ~] = size(Y_temp_diff);
-            Theta = zeros(num_responses, size(Y_temp, 1),length(lambda_list));
-            
-            MSE_accum = zeros(length(lambda_list),1);
-            
-            n_inner_cv = 4;
-            % Perform Lasso regression for each response variable
-            parfor i = 1:num_responses
-                % Transpose data to match lasso's expected input
-                [B, ~] = lasso(Y_temp(:,1:round(size(Y_temp,2)*(n_inner_cv-1)/n_inner_cv))', ...
-                    Y_temp_diff(i, 1:round(size(Y_temp,2)*(n_inner_cv-1)/n_inner_cv))', 'lambda', lambda_list, 'Standardize', true);
-                % If multiple coefficients are returned, select the one corresponding to lambda
-                Theta(i, :, :) = B;  % Assuming lambda is a scalar
-            end
-            for n_inner = 1:length(lambda_list)
-                W = (eye(size(Theta,1)) + squeeze(Theta(:,:,n_inner)));
-                Y_hat = W  * Y_temp(:,round(size(Y_temp,2)*(n_inner_cv-1)/n_inner_cv)+1:end);
-                loss = sum((X_temp(:,round(size(Y_temp,2)*(n_inner_cv-1)/n_inner_cv)+1:end) - Y_hat).^2,2);
-                denom = sum((X_temp(:,round(size(Y_temp,2)*(n_inner_cv-1)/n_inner_cv)+1:end) - mean(X_temp(:,round(size(Y_temp,2)*(n_inner_cv-1)/n_inner_cv)+1:end),2)).^2,2);
-                R_squared_temp = 1-mean(loss./denom);
-                MSE_accum(n_inner) = R_squared_temp;
-            end
-            [~,max_idx] = max(MSE_accum);
-            best_lambda = lambda_list(max_idx);
-            fprintf('Current best hyperpameter = %.f \n',best_lambda);
-            
-            Theta_best = zeros(num_responses, size(Y_temp, 1));
-            parfor i = 1:num_responses
-                % Transpose data to match lasso's expected input
-                [B, ~] = lasso(Y_temp', Y_temp_diff(i, :)', 'lambda', best_lambda, 'Standardize', true);
-                % If multiple coefficients are returned, select the one corresponding to lambda
-                Theta_best(i, :) = B;  % Assuming lambda is a scalar
-            end
-            
-            W = (eye(size(Theta_best)) + Theta_best) ;
-            Y_hat = W  * Y_temp_pred;
-            loss = sum((X_temp_pred - Y_hat).^2,2);
-            denom = sum((X_temp_pred - mean(X_temp_pred,2)).^2,2);
-            R_squared_session(n_ses) = 1-mean(loss./denom);
+            R2 = linear_LASSO_yj(Y_temp,X_temp,Y_temp_pred,X_temp_pred,lambda_max_training);
+            R_squared_session(n_ses) = R2;
         end
         R_squared_fold_current(n_test) = mean(R_squared_session);
-        disp(mean(R_squared_session));
+        session_count(n_test) = num_session;
+        fprintf('R-squared (current test subject):%.6f \n', mean(R_squared_session));
         toc
+        disp('');
     end
     R_squared_fold_current(isnan(R_squared_fold_current)) = 0;
-    R_squared_fold_lasso(n_cv) = sum(R_squared_fold_current.*session_count)/sum(session_count);
-    disp(['R_squared: ',num2str(R_squared_fold_lasso(n_cv),'%.6f')])
+    R_squared_fold_LASSO(n_cv) = sum(R_squared_fold_current.*session_count)/sum(session_count);
+    disp(['R_squared (current fold): ',num2str(R_squared_fold_LASSO(n_cv),'%.6f'),'\n\n'])
 end
 
-save results/other_model_cv_results R_squared_fold_lasso
+save('results/other_model_cv_results', 'R_squared_fold_LASSO', '-append');
+
+
+%% Non-linear (manifold)
+% h_list = [10.02,11.54];
+h_list = 2:2:20;
+%%% training %%%
+R2_list_allsub_h = zeros(length(tau),length(h_list));
+for nsub = 1:length(tau)
+    disp(['=== (for training) sub-',num2str(nsub,'%04d'),' ===']);
+    is_current_sub = data_index_sub == nsub;
+    num_session = round(sum(is_current_sub)/(length(t_fine)-1));
+    Y_sub = Y(:,is_current_sub);
+    X_sub = X(:,is_current_sub);
+    tic
+    R2_list_ses_h = zeros(num_session,length(h_list));
+    for n_ses = 1:num_session
+        Y_sub_sess = Y_sub(:,(n_ses-1)*(length(t_fine)-1)+1:n_ses*(length(t_fine)-1));
+        X_sub_sess = X_sub(:,(n_ses-1)*(length(t_fine)-1)+1:n_ses*(length(t_fine)-1));
+        
+        n_inner_cv = 5;
+        Y_fitting = Y_sub_sess(:,1:round(size(Y_sub_sess,2)*(n_inner_cv-1)/n_inner_cv));
+        X_fitting = X_sub_sess(:,1:round(size(Y_sub_sess,2)*(n_inner_cv-1)/n_inner_cv));
+        Y_validation = Y_sub_sess(:,round(size(Y_sub_sess,2)*(n_inner_cv-1)/n_inner_cv)+1:end);
+        X_validation = X_sub_sess(:,round(size(Y_sub_sess,2)*(n_inner_cv-1)/n_inner_cv)+1:end);
+        
+        R2_list_h = zeros(1,length(h_list));
+        for n_h = 1:length(h_list)
+            h = h_list(n_h);
+            R2 = nonlinear_manifold_yj(Y_fitting,X_fitting,Y_validation,X_validation,h);
+            R2_list_h(n_h) = R2;
+        end
+        [best_R2,best_idx] = max(R2_list_h);
+        fprintf('Current best h = %.3f, best R2 = %.6f \n', h_list(best_idx), best_R2);
+        R2_list_ses_h(n_ses,:) = R2_list_h;
+    end
+    toc
+    R2_list_allsub_h(nsub,:) = mean(R2_list_ses_h);
+end
+
+save results/manifold_training_temp R2_list_allsub_h h_list
+
+%%% test %%%
+R_squared_fold_manifold = zeros(cv_num,1);
+for n_cv = 1:cv_num
+    disp(['=== CV prediction fold #',num2str(n_cv),'===']);
+    lambda = lambda_fold{n_cv};
+    
+    current_train_subjects = train_id_list{n_cv};
+    current_test_subjects = test_id_list{n_cv};
+    
+    temp_R2_h_list = R2_list_allsub_h(current_train_subjects,:);
+    temp_tau = tau(current_train_subjects);
+    temp_R2_h_list(temp_tau==0,:) = [];
+    temp_h_list = h_list;
+    
+    temp_h_list(1) = [];
+    temp_R2_h_list(:,1) = [];
+    
+    mean_temp_R2_h_list = mean(temp_R2_h_list);
+    h_fine = temp_h_list(1):0.001:temp_h_list(end);
+    mean_temp_R2_h_fine = spline(temp_h_list,mean_temp_R2_h_list,h_fine);
+    
+    [~,idx_max] = max(mean_temp_R2_h_fine);
+    h_max_training = h_fine(idx_max);
+    fprintf('Hyperparameter h of current fold: %.3f\n',h_max_training);
+    
+    R_squared_fold_current = zeros(1,length(current_test_subjects));
+    session_count = zeros(1,length(current_test_subjects));
+    for n_test = 1:length(current_test_subjects)
+        tic
+        current_subject = current_test_subjects(n_test);
+        is_test = data_index_sub == current_subject;
+        num_session = round(sum(is_test)/(length(t_fine)-1));
+        X_test = X(:,is_test);
+        Y_test = Y(:,is_test);
+        R_squared_session = zeros(1,num_session);
+        for n_ses = 1:num_session
+            X_test_sess = X_test(:,(n_ses-1)*(length(t_fine)-1)+1:n_ses*(length(t_fine)-1));
+            Y_test_sess = Y_test(:,(n_ses-1)*(length(t_fine)-1)+1:n_ses*(length(t_fine)-1));
+
+            X_temp = X_test_sess(:,1:round(length(t_fine)*4/5));
+            Y_temp = Y_test_sess(:,1:round(length(t_fine)*4/5));
+            X_temp_pred = X_test_sess(:,round(length(t_fine)*4/5)+1:end);
+            Y_temp_pred = Y_test_sess(:,round(length(t_fine)*4/5)+1:end);
+            
+            R2 = nonlinear_manifold_yj(Y_temp,X_temp,Y_temp_pred,X_temp_pred,h_max_training);
+            R_squared_session(n_ses) = R2;
+        end
+        R_squared_fold_current(n_test) = mean(R_squared_session);
+        session_count(n_test) = num_session;
+        fprintf('R-squared (current test subject):%.6f \n', mean(R_squared_session));
+        toc
+        disp('');
+    end
+    R_squared_fold_current(isnan(R_squared_fold_current)) = 0;
+    R_squared_fold_manifold(n_cv) = sum(R_squared_fold_current.*session_count)/sum(session_count);
+    disp(['R_squared (current fold): ',num2str(R_squared_fold_manifold(n_cv),'%.6f'),'\n\n'])
+end
+
+save('results/other_model_cv_results', 'R_squared_fold_manifold', '-append');
