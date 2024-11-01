@@ -164,24 +164,34 @@ end
 save DMs/DM_cortical_subcortical_noROInorm_CV Phi_fold lambda_fold roi_exclude
 
 %% Testing DM consistency
-max_DMs = 18;
+max_DMs = 24;
 
+
+rng(321); % for reproducibility
+
+Phi_raw_all = [];
 Phi_abs_all = [];
+Phi_angle_all = [];
 for n_cv = 1:cv_num
     Phi = Phi_fold{n_cv};
+    Phi_raw_all = [Phi_raw_all,(Phi(:,1:2:max_DMs))]; %#ok<AGROW>
     Phi_abs_all = [Phi_abs_all,abs(Phi(:,1:2:max_DMs))]; %#ok<AGROW>
+    Phi_angle_all = [Phi_angle_all,angle(Phi(:,1:2:max_DMs))]; %#ok<AGROW>
 end
 [cluster_idx, C] = kmeans(Phi_abs_all', max_DMs/2, 'Replicates', 10);
 for n_cv = 1:cv_num
     assert(length(unique(cluster_idx((n_cv-1)*max_DMs/2+1:n_cv*max_DMs/2))) == max_DMs/2)
 end
 
-consistency_list = cell(max_DMs/2,1);
+consistency_corr_list = cell(max_DMs/2,1);
+consistency_CS_list = cell(max_DMs/2,1);
 for n_dm = 1:max_DMs/2
     figure;
     iter_n = 0;
     Phi_select = Phi_abs_all(:,cluster_idx==n_dm);
+    Phi_raw_select = Phi_raw_all(:,cluster_idx==n_dm);
     corr_mat = zeros(cv_num);
+    CS_mat = zeros(cv_num);
     for n_cv1 = 1:cv_num
         for n_cv2 = 1:cv_num
             iter_n = iter_n + 1;
@@ -190,11 +200,44 @@ for n_dm = 1:max_DMs/2
             
             r = corrcoef(Phi_select(:,n_cv1),Phi_select(:,n_cv2));
             corr_mat(n_cv1,n_cv2) = r(2);
+            
+            cs = abs(dot(Phi_raw_select(:,n_cv1),Phi_raw_select(:,n_cv2)))/...
+                (sqrt(dot(Phi_raw_select(:,n_cv1),Phi_raw_select(:,n_cv1))) * sqrt(dot(Phi_raw_select(:,n_cv2),Phi_raw_select(:,n_cv2))));
+
+            CS_mat(n_cv1,n_cv2) = abs(cs);
         end
     end
-    consistency_list{n_dm} = corr_mat;
+    consistency_corr_list{n_dm} = corr_mat;
+    consistency_CS_list{n_dm} = CS_mat;
 end
 
+DM_labels = {'Principal DM (DM 1)','CEN-to-DMN (DM 2)','DMN-to-CEN (DM 3)','FV-to-SM (DM 4)','Bi-asym (DM 5)', ...
+                'PCC-seed CAP (DM 6)','Attention-SM (DM 7)', 'Ventral attention (DM 8)', 'DAN-DMN (DM 9)', ...
+                'Slience-SM (DM 10)', 'DM 11', 'DM 12'};
+            
+figure;
+count = 0;
+for n_dm = [3,10,2,5,7,12,8,9,1,11,6,4]
+    count = count + 1;
+    subplot(3,4,count); 
+    heatmap(consistency_CS_list{n_dm}, 'ColorLimits', [0,1]);
+    title(DM_labels{count});
+    if rem(count,4) == 1; ylabel('CV fold'); end
+    if count > 8; xlabel('CV fold'); end
+    set(gca, 'FontName', 'Times New Roman', 'FontSize', 18);
+end
+
+% figure;
+% count = 0;
+% for n_dm = [3,10,2,5,7,12,8,9,1,11,6,4]
+%     count = count + 1;
+%     subplot(3,4,count); 
+%     heatmap(consistency_corr_list{n_dm}, 'ColorLimits', [0,1]);
+%     title(DM_labels{count});
+%     if rem(count,4) == 1; ylabel('CV fold'); end
+%     if count > 8; xlabel('CV fold'); end
+%     set(gca, 'FontName', 'Times New Roman', 'FontSize', 18);
+% end
 %% CV prediction
 disp('*** CV prediction started! ***');
 max_DMs = 24;
@@ -430,6 +473,119 @@ end
 
 save('results/other_model_cv_results', 'R_squared_fold_LASSO', '-append');
 
+%% Hyperparameter Plot for All CV Folds in a Single Figure
+
+% Determine the number of CV folds
+% Ensure cv_num is defined; if not, set it based on the length of lambda_fold
+if ~exist('cv_num', 'var') || isempty(cv_num)
+    cv_num = length(lambda_fold);
+end
+
+% Determine the layout for subplots (rows and columns)
+% For better visualization, aim for a nearly square grid
+num_cols = ceil(sqrt(cv_num));
+num_rows = ceil(cv_num / num_cols);
+
+% Create a new figure for all CV folds
+figure('Name', 'R² vs \lambda Across CV Folds', 'NumberTitle', 'off','Position',[100, 100, 1400, 700]);
+
+% Create a tiled layout
+t = tiledlayout(num_rows, num_cols, 'TileSpacing', 'Compact', 'Padding', 'Compact');
+
+% Initialize a cell to store optimal lambdas for all folds (optional)
+optimal_lambdas = zeros(cv_num, 1);
+
+% Loop through each CV fold
+for n_cv = 1:cv_num
+    disp(['=== CV Prediction Fold #', num2str(n_cv), ' ===']);
+    lambda = lambda_fold{n_cv};
+    
+    current_train_subjects = train_id_list{n_cv};
+    current_test_subjects = test_id_list{n_cv};
+    
+    temp_R2_lambda_list = R2_list_allsub_lambda(current_train_subjects, :);
+    temp_tau = tau(current_train_subjects);
+    temp_R2_lambda_list(temp_tau == 0, :) = [];
+    temp_lambda_list = lambda_list;
+    
+    % Remove the first lambda value and corresponding R2 values
+    temp_lambda_list(1) = [];
+    temp_R2_lambda_list(:,1) = [];
+    
+    % Calculate the mean R2 across subjects for each lambda
+    mean_temp_R2_lambda_list = mean(temp_R2_lambda_list);
+    
+    % Create a finer lambda grid for interpolation
+    lambda_fine = temp_lambda_list(1):0.001:temp_lambda_list(end);
+    
+    % Perform spline interpolation on the mean R2 values
+    mean_temp_R2_lambda_fine = spline(temp_lambda_list, mean_temp_R2_lambda_list, lambda_fine);
+    
+    % Find the lambda that maximizes the interpolated mean R2
+    [~, idx_max] = max(mean_temp_R2_lambda_fine);
+    lambda_max_training = lambda_fine(idx_max);
+    max_R2 = mean_temp_R2_lambda_fine(idx_max);
+    
+    fprintf('Optimal lambda for CV fold %d: %.3f\n', n_cv, lambda_max_training);
+    
+    % Store the optimal lambda (optional)
+    optimal_lambdas(n_cv) = lambda_max_training;
+    
+    %%% Plotting within the tiled layout
+    % Select the next tile
+    nexttile;
+    hold on; % Hold on to plot multiple elements
+    
+    % Plot the original mean R2 values as blue dots
+    plot(temp_lambda_list, mean_temp_R2_lambda_list, 'bo', ...
+        'MarkerFaceColor', 'b', 'DisplayName', 'Original R²');
+    
+    % Define sky blue color using RGB triplet
+    skyblue = [0.529, 0.808, 0.980];
+    % Plot the interpolated mean R2 values as a sky blue line
+    plot(lambda_fine, mean_temp_R2_lambda_fine, '-', ...
+        'Color', skyblue, 'LineWidth', 1.5, 'DisplayName', 'Interpolated R²');
+    
+    % Plot the optimal lambda as a red 'x'
+    plot(lambda_max_training, max_R2, 'rx', ...
+        'MarkerSize', 10, 'LineWidth', 2, 'DisplayName', 'Optimal \lambda');
+    
+     % -------------------------------
+    % Add Text Annotation for Optimal Lambda
+    % -------------------------------
+    % Define the text label string with lambda value formatted to three decimal places
+    lambda_text = sprintf('\\lambda_{best} = %.3f', lambda_max_training);
+    
+    % Determine text position offsets for better visibility
+    % Adjust the offsets as needed based on your data range
+    x_offset = 0.05 * (max(temp_lambda_list) - min(temp_lambda_list));
+    y_offset = 0.3 * (max(mean_temp_R2_lambda_fine) - min(mean_temp_R2_lambda_fine));
+    
+    % Add text near the optimal lambda point
+    text(lambda_max_training + x_offset, max_R2 - y_offset, lambda_text, ...
+        'Color', 'black', 'FontSize', 18, 'FontWeight', 'bold', ...
+        'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom');
+    
+    hold off; % Release the hold
+    
+    % Enhance subplot aesthetics
+    xlabel('\lambda', 'FontSize', 18);
+    ylabel('Mean R²', 'FontSize', 18);
+    title(['Fold ', num2str(n_cv)], 'FontSize', 22);
+    if n_cv == cv_num
+        legend('Location', 'best', 'FontSize', 18);
+    end
+    grid on; % Add grid lines for better readability
+end
+
+% Adjust the overall figure title
+title(t, 'R² vs \lambda Across All CV Folds', 'FontSize', 16, 'FontWeight', 'bold');
+
+% Optionally, display all optimal lambdas after the plots
+fprintf('\nOptimal \lambda values across all CV folds:\n');
+disp(optimal_lambdas);
+
+
 
 %% Non-linear (manifold)
 % h_list = [10.02,11.54];
@@ -484,8 +640,8 @@ for n_cv = 1:cv_num
     temp_R2_h_list(temp_tau==0,:) = [];
     temp_h_list = h_list;
     
-    temp_h_list(1) = [];
-    temp_R2_h_list(:,1) = [];
+%     temp_h_list(1) = [];
+%     temp_R2_h_list(:,1) = [];
     
     mean_temp_R2_h_list = mean(temp_R2_h_list);
     h_fine = temp_h_list(1):0.001:temp_h_list(end);
@@ -529,3 +685,115 @@ for n_cv = 1:cv_num
 end
 
 save('results/other_model_cv_results', 'R_squared_fold_manifold', '-append');
+
+%% Hyperparameter Plot for All CV Folds in a Single Figure (Using Hyperparameter h)
+
+% Determine the number of CV folds
+% Ensure cv_num is defined; if not, set it based on the length of h_fold
+if ~exist('cv_num', 'var') || isempty(cv_num)
+    cv_num = length(h_fold);
+end
+
+% Determine the layout for subplots (rows and columns)
+% For better visualization, aim for a nearly square grid
+num_cols = ceil(sqrt(cv_num));
+num_rows = ceil(cv_num / num_cols);
+
+% Create a new figure for all CV folds
+figure('Name', 'R² vs h Across CV Folds', 'NumberTitle', 'off', 'Position', [100, 100, 1400, 700]);
+
+% Create a tiled layout
+t = tiledlayout(num_rows, num_cols, 'TileSpacing', 'Compact', 'Padding', 'Compact');
+
+% Initialize a vector to store optimal h values for all folds (optional)
+optimal_h = zeros(cv_num, 1);
+
+% Loop through each CV fold
+for n_cv = 1:cv_num
+    disp(['=== CV Prediction Fold #', num2str(n_cv), ' ===']);
+    
+    current_train_subjects = train_id_list{n_cv};
+    current_test_subjects = test_id_list{n_cv};
+    
+    temp_R2_h_list = R2_list_allsub_h(current_train_subjects, :);
+    temp_tau = tau(current_train_subjects);
+    temp_R2_h_list(temp_tau == 0, :) = [];
+    temp_h_list = h_list;
+    
+    % Remove the first h value and corresponding R² values
+    temp_h_list(1) = [];
+    temp_R2_h_list(:,1) = [];
+    
+    % Calculate the mean R² across subjects for each h
+    mean_temp_R2_h_list = mean(temp_R2_h_list);
+    
+    % Create a finer h grid for interpolation
+    h_fine = temp_h_list(1):0.001:h_list(end);
+    
+    % Perform spline interpolation on the mean R² values
+    mean_temp_R2_h_fine = spline(temp_h_list, mean_temp_R2_h_list, h_fine);
+    
+    % Find the h that maximizes the interpolated mean R²
+    [~, idx_max] = max(mean_temp_R2_h_fine);
+    h_max_training = h_fine(idx_max);
+    max_R2 = mean_temp_R2_h_fine(idx_max);
+    
+    fprintf('Optimal h for CV fold %d: %.3f\n', n_cv, h_max_training);
+    
+    % Store the optimal h (optional)
+    optimal_h(n_cv) = h_max_training;
+    
+    %%% Plotting within the tiled layout
+    % Select the next tile
+    nexttile;
+    hold on; % Hold on to plot multiple elements
+    
+    % Plot the original mean R² values as blue dots
+    plot(temp_h_list, mean_temp_R2_h_list, 'bo', ...
+        'MarkerFaceColor', 'b', 'DisplayName', 'Original R²');
+    
+    % Define sky blue color using RGB triplet
+    skyblue = [0.529, 0.808, 0.980];
+    % Plot the interpolated mean R² values as a sky blue line
+    plot(h_fine, mean_temp_R2_h_fine, '-', ...
+        'Color', skyblue, 'LineWidth', 1.5, 'DisplayName', 'Interpolated R²');
+    
+    % Plot the optimal h as a red 'x'
+    plot(h_max_training, max_R2, 'rx', ...
+        'MarkerSize', 10, 'LineWidth', 2, 'DisplayName', 'Optimal h');
+    
+    % -------------------------------
+    % Add Text Annotation for Optimal h
+    % -------------------------------
+    % Define the text label string with h value formatted to three decimal places
+    h_text = sprintf('h_{best} = %.3f', h_max_training);
+    
+    % Determine text position offsets for better visibility
+    % Adjust the offsets as needed based on your data range
+    x_offset = 0.05 * (max(temp_h_list) - min(temp_h_list));
+    y_offset = 0.3 * (max(mean_temp_R2_h_fine) - min(mean_temp_R2_h_fine));
+    
+    % Add text near the optimal h point
+    text(h_max_training + x_offset, max_R2 - y_offset, h_text, ...
+        'Color', 'black', 'FontSize', 18, 'FontWeight', 'bold', ...
+        'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom');
+    
+    hold off; % Release the hold
+    
+    % Enhance subplot aesthetics
+    xlabel('h', 'FontSize', 18);
+    ylabel('Mean R²', 'FontSize', 18);
+    title(['Fold ', num2str(n_cv)], 'FontSize', 22);
+    if n_cv == cv_num
+        legend('Location', 'best', 'FontSize', 18);
+    end
+    grid on; % Add grid lines for better readability
+end
+
+% Adjust the overall figure title
+title(t, 'R² vs h Across All CV Folds', 'FontSize', 16, 'FontWeight', 'bold');
+
+% Optionally, display all optimal h values after the plots
+fprintf('\nOptimal h values across all CV folds:\n');
+disp(optimal_h);
+
