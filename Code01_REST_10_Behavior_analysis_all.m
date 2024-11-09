@@ -134,7 +134,7 @@ for n_dm = 1:num_DM
         r_values_B_mean(n_dm, n_fa) = r_B_mean(2);
     end
 end
-DM_names = {'Principal','FV-to-S','SN-to-DMN','Bi-asym','SN-to-CEN'};
+DM_names = {'Principal','FV-to-SM','SN-to-DMN','Bi-asym','SN-to-CEN'};
 if num_FA == 4
     col_names = {'Mental Health', 'Cognition', 'Processing Speed', 'Substance Use'};
 elseif num_FA == 5
