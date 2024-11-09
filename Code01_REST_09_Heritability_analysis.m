@@ -6,7 +6,7 @@ load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B
 
 [sub_ids,sorted_idx] = sort(sub_ids);
 D = D(:,sorted_idx);
-B = B(:,sorted_idx);
+B = B_mean(:,sorted_idx);
 
 D(1,:) = [];
 D(:,tau<2000) = [];
@@ -95,8 +95,8 @@ angle_D = angle(D(1:2:end,:));
 BB = B(1:2:end,:);
 for ii = 1:size(abs_D,1)
 %     dd = abs_D(ii,:)';
-%     dd = angle_D(ii,:)';
-    dd = BB(ii,:)';
+    dd = angle_D(ii,:)';
+%     dd = BB(ii,:)';
     new_dd = dd - X * pinv(X) * dd;
     Y = [new_dd,Y];
 end
@@ -348,10 +348,10 @@ c =  [0.45, 0.80, 0.69;...
 figure('Name','Cosine Distance Box Plot','NumberTitle','off');
 h = daviolinplot(distanceTable.CosineDistance,'groups',group_inx,'color',c,'xtlabels', groupNames,'violin','full');
 % boxplot(distanceTable.CosineDistance, distanceTable.Group);
-xlabel('Group');
-ylabel('Cosine Distance');
-title('Cosine Distance Distribution by Group');
-set(gca, 'FontName', 'Times New Roman', 'FontSize', 14);
+% xlabel('Group');
+% ylabel('Cosine Distance');
+% title('Cosine Distance Distribution by Group');
+set(gca, 'FontName', 'Times New Roman', 'FontSize', 24);
 
 
 
