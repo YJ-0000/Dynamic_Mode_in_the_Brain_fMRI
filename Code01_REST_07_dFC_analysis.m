@@ -9,8 +9,9 @@ load('results/HCP_timeseries_cortical_subcortical_extracted_filtered.mat');
 % Date: 2024-10-11
 
 %%% Define Parameters
-WL = 30;                  % Window length in TRs (adjust as needed)
-corr_threshold = 0.2;     % Correlation threshold for peak detection (optional)
+tr = 0.72;
+w = 45;
+WL = round(w/tr);                  % Window length in TRs (adjust as needed)
 num_subjects = size(time_series_denoised_filtered, 1); % 1096
 num_sessions = size(time_series_denoised_filtered, 2); % 4
 num_rois = 360;           % Number of ROIs
@@ -54,6 +55,9 @@ for subj = 1:num_subjects
             % Transpose to [Time Points x ROIs] for consistency
             fmri_data = fmri_data';
             
+            % high-pass filter
+            fmri_data = highpass(fmri_data,1/(tr*WL),1/tr);
+            
             % Handle Global Signal Regression if not already done
             % Uncomment the following lines if GSR needs to be performed here
             % group_data_gsr = regress_out_global_signal(fmri_data);
@@ -91,8 +95,11 @@ for pair = 1:num_pairs
     dstd_group(roi2,roi1) = dstd_group_vec(pair);
 end
 
+eval(['dsta_all_',num2str(w),' = dstd_all;']);
+eval(['dstd_group_',num2str(w),' = dstd_group;']);
+
 %%% Post-processing and Saving Results
-save('dstd_all.mat', 'dstd_group','dstd_all');
+save('results/dstd_all.mat', ['dstd_group_',num2str(w)],'-append');
 disp('Dynamic Functional Connectivity (dFC) Std calculation completed successfully.');
 
 %% dFC - Excursion
@@ -191,81 +198,6 @@ save('execursion_all.mat', 'execursion_group','execursion_all');
 disp('Dynamic Functional Connectivity (dFC) Execursion calculation completed successfully.');
 
 %% functions
-function dstd = compute_dstd(x, y, WL)
-% compute_dstd Calculates the standard deviation of dynamic functional connectivity (dFC Std)
-%
-% Syntax:
-%   dstd = compute_dstd(x, y, WL)
-%
-% Inputs:
-%   x  - A vector of length N representing the time series of ROI 1
-%   y  - A vector of length N representing the time series of ROI 2
-%   WL - Window length (number of consecutive time points)
-%
-% Outputs:
-%   dstd - The standard deviation of the sliding window correlation coefficients
-%
-% Example:
-%   N = 1200;
-%   x = randn(N, 1);
-%   y = randn(N, 1);
-%   WL = 30;
-%   dstd = compute_dstd(x, y, WL);
-
-    % Ensure inputs are column vectors
-    x = x(:);
-    y = y(:);
-    
-    % Check that x and y are of the same length
-    if length(x) ~= length(y)
-        error('Time series x and y must be of the same length.');
-    end
-    
-    N = length(x);
-    
-    % Number of sliding windows
-    num_windows = N - WL + 1;
-    
-    % Initialize vector to store correlation coefficients
-    rho = zeros(num_windows, 1);
-    
-    % Compute mean and standard deviation for x and y within each window
-    % Vectorized computation for efficiency
-    % Create a matrix where each row is a window for x and y
-    X = zeros(num_windows, WL);
-    Y = zeros(num_windows, WL);
-    for w = 1:WL
-        X(:, w) = x(w:(w + num_windows -1));
-        Y(:, w) = y(w:(w + num_windows -1));
-    end
-    
-    % Compute mean for each window
-    mean_X = mean(X, 2);
-    mean_Y = mean(Y, 2);
-    
-    % Demean the data
-    X_demean = X - mean_X;
-    Y_demean = Y - mean_Y;
-    
-    % Compute numerator and denominator for Pearson correlation
-    numerator = sum(X_demean .* Y_demean, 2);
-    denominator = sqrt(sum(X_demean.^2, 2) .* sum(Y_demean.^2, 2));
-    
-    % Avoid division by zero
-    denominator(denominator == 0) = eps;
-    
-    % Compute Pearson correlation coefficients
-    rho = numerator ./ denominator;
-    
-    % Compute mean correlation across all windows
-    rho_mean = mean(rho);
-    
-    % Compute standard deviation as per the formula
-    dstd = sqrt(mean((rho - rho_mean).^2));
-    
-end
-
-
 
 function excursion = compute_excursion(rho)
 % compute_excursion Calculates the Excursion of dynamic functional connectivity (dFC Excursion)

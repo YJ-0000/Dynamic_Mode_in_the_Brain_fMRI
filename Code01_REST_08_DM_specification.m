@@ -1,7 +1,7 @@
 clear; clc; close all;
 %%
 load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm
-load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10
+load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B
 %%
 load results/RSFC_standard_grad
 load results/RSFC
@@ -9,7 +9,7 @@ load results/RSFC
 %% FC
 N = 360;
 
-max_dm = 1;
+max_dm = 5;
 
 Phi_DM_ang_accum = zeros(N,N,max_dm);
 
@@ -36,6 +36,8 @@ for n_dm = 1:max_dm %1:5
     % Compute modularity and sort matrices
     [ci, Q] = modularity_und(group_corr_mat_original);
     [ci_recon, Q_recon] = modularity_und(Phi_DM_ang_mat);
+%     [ci] = community_louvain(group_corr_mat_original);
+%     [ci_recon] = community_louvain(Phi_DM_ang_mat);
     
     % Sort the reconstructed FC matrix
     [~, idx_sorted] = sort(ci);
@@ -134,6 +136,8 @@ lambda_indiv_mean = mean(D(2:end,:),2);
 [lambda_indiv_mean_sorted,idx_sorted] = sort(lambda_indiv_mean,'descend');
 Phi_sorted_indiv = Phi_sorted(:,idx_sorted);
 
+B_group = mean(B_mean(:,tau~=0),2);
+
 max_dm = 5;
 
 frame_dt = 0.5;
@@ -153,7 +157,8 @@ for n_dm = 1:max_dm
         for roi=1:N 
             eigenstate(roi)= real((lambda_conjugate1^(frame*frame_dt/TRtarget))*Phi_sorted(roi,DM_conjugate1_num) + (lambda_conjugate2^(frame*frame_dt/TRtarget))*Phi_sorted(roi,DM_conjugate2_num));
         end
-        reconstructed_timeseries(:,frame+1,n_dm) = abs(lambda(DM_conjugate1_num))*eigenstate;
+%         reconstructed_timeseries(:,frame+1,n_dm) = abs(lambda(DM_conjugate1_num))*eigenstate;
+        reconstructed_timeseries(:,frame+1,n_dm) = B_group(DM_conjugate1_num)*eigenstate;
     end
 end
 
@@ -169,7 +174,43 @@ for n_dm = 1:max_dm
     r_accum(n_dm) = r(2);
 end
 
-%%
+%% calculate dFC (DM1)
+N_cortex = 360;
+WL = round(30*0.72/0.5);
+dFC_reconstructed_DM1 = zeros(N_cortex,N_cortex);
+for roi1 = 1:N_cortex
+    fprintf('%d ',roi1);
+    x = squeeze(reconstructed_timeseries(roi1,:,1));
+    parfor roi2 = (roi1+1):N_cortex
+        y = squeeze(reconstructed_timeseries(roi2,:,1));
+        dFC_reconstructed_DM1(roi1,roi2) = compute_dstd(x, y, WL);
+    end
+end
+fprintf('\n');
+
+dFC_reconstructed_DM1 = dFC_reconstructed_DM1 + dFC_reconstructed_DM1';
+
+save DMs/temp_dFC_DMs dFC_reconstructed_DM1
+
+%% calculate dFC
+N_cortex = 360;
+WL = round(30*0.72/0.5);
+dFC_reconstructed = zeros(N_cortex,N_cortex);
+for roi1 = 1:N_cortex
+    fprintf('%d ',roi1);
+    x = squeeze(mean(reconstructed_timeseries(roi1,:,1:max_dm),3));
+    parfor roi2 = (roi1+1):N_cortex
+        y = squeeze(mean(reconstructed_timeseries(roi2,:,1:max_dm),3));
+        dFC_reconstructed(roi1,roi2) = compute_dstd(x, y, WL);
+    end
+end
+fprintf('\n');
+
+dFC_reconstructed = dFC_reconstructed + dFC_reconstructed';
+
+save('DMs/temp_dFC_DMs', 'dFC_reconstructed','-append');
+
+%% Community analysis
 load results/RSFC
 
 disp(['The correlation between reconstructed FC and FC = ', num2str(r(2),'%0.4f')]);
@@ -183,6 +224,7 @@ figure; plot(r_accum); title('recon FC vs FC'); xlabel('number of DMs');
 ci_recon2 = ci_recon;
 ci_recon(ci_recon2==1) = 2;
 ci_recon(ci_recon2==2) = 1;
+ci_recon(ci_recon2==3) = 3;
 
 N = 360;
 label_idx_list = 1:N;
@@ -328,12 +370,12 @@ sgtitle('Comparison of Reconstructed FC and Original Group Correlation', ...
 %% FC gradient
 N = 360;
 
-max_dm = 9;
+max_dm = 5;
 
 Phi_DM_ang_accum = zeros(N,N,max_dm);
 r_accum = zeros(1,max_dm);
 
-for n_dm = 1:max_dm %1:5
+for n_dm = 1:max_dm
         
     Phi_DM_ang = angle(Phi_sorted(1:N,2*n_dm));
     
@@ -402,14 +444,9 @@ for n_dm = 1:1
     DM_conjugate1_num = 2*(n_dm-1)+1;
     DM_conjugate2_num = 2*n_dm;
     
-%     lambda_conjugate1 = lambda_indiv_mean(DM_conjugate1_num)/abs(lambda_indiv_mean(DM_conjugate1_num));
-%     lambda_conjugate2 = lambda_indiv_mean(DM_conjugate2_num)/abs(lambda_indiv_mean(DM_conjugate2_num));
-    
     lambda_conjugate1 = lambda(DM_conjugate1_num);
     lambda_conjugate2 = lambda(DM_conjugate2_num);
 
-%     lambda_conjugate1 = exp(1i*(2*pi/18.7200)*sign(lambda(DM_conjugate1_num)));
-%     lambda_conjugate2 = exp(1i*(2*pi/18.7200)*sign(lambda(DM_conjugate2_num)));
     
     
     for frame = 0:1:frame_num
@@ -439,33 +476,29 @@ end
 %% anti-corr QPP
 load results/QPP_100_GSR
 lambda_indiv_mean = mean(D(2:end,:),2);
+% B_group = mean(B_mean(:,tau~=0),2);
 
 frame_dt = 0.72;
-frame_num = 100-0;
+frame_num = 3000;
 TRtarget = 1.5;
 N = 360;
 reconstructed_timeseries = zeros(N,frame_num+1,9);
 tracking_num = 0;
-for n_dm =[1,2,3,9]
+for n_dm =[3, 1]
+    ref_t = 0;
     tracking_num = tracking_num + 1;
     
     DM_conjugate1_num = 2*(n_dm-1)+1;
     DM_conjugate2_num = 2*n_dm;
     
-%     lambda_conjugate1 = lambda_indiv_mean(DM_conjugate1_num)/abs(lambda_indiv_mean(DM_conjugate1_num));
-%     lambda_conjugate2 = lambda_indiv_mean(DM_conjugate2_num)/abs(lambda_indiv_mean(DM_conjugate2_num));
-    
-    lambda_conjugate1 = lambda(DM_conjugate1_num);
-    lambda_conjugate2 = lambda(DM_conjugate2_num);
-
-%     lambda_conjugate1 = exp(1i*(2*pi/18.7200)*sign(lambda(DM_conjugate1_num)));
-%     lambda_conjugate2 = exp(1i*(2*pi/18.7200)*sign(lambda(DM_conjugate2_num)));
+    lambda_conjugate1 = lambda(DM_conjugate1_num)/abs(lambda(DM_conjugate1_num));
+    lambda_conjugate2 = lambda(DM_conjugate2_num)/abs(lambda(DM_conjugate2_num));
     
     
     for frame = 0:1:frame_num
         eigenstate = zeros(N,1);
         for roi=1:N 
-            eigenstate(roi)= real((lambda_conjugate1^(frame*frame_dt/TRtarget))*Phi_sorted(roi,DM_conjugate1_num) + (lambda_conjugate2^(frame*frame_dt/TRtarget))*Phi_sorted(roi,DM_conjugate2_num));
+            eigenstate(roi)= real((lambda_conjugate1^((frame*frame_dt+ref_t)/TRtarget))*Phi_sorted(roi,DM_conjugate1_num) + (lambda_conjugate2^((frame*frame_dt+ref_t)/TRtarget))*Phi_sorted(roi,DM_conjugate2_num));
         end
         reconstructed_timeseries(:,frame+1,tracking_num) = eigenstate;
     end
@@ -478,7 +511,8 @@ for n_dm =[1,2,3,9]
         r = corrcoef(temp_dm(:),final_qpp_template(:));
         corr_time_series(frame) = r(2);
     end
-    disp(['Max correlation with QPP - DM',num2str(n_dm),': ',num2str(max(corr_time_series),'%.4f')]);
+    [max_r,max_idx] = max(corr_time_series);
+    disp(['Max correlation with QPP - DM',num2str(n_dm),': ',num2str(max_r,'%.4f'), ' at time t=', num2str(max_idx*frame_dt)]);
 end
 
 %% RSFC grad correlation time course
@@ -487,12 +521,14 @@ frame_num = 200;
 TRtarget = 1.5;
 N = 360;
 
-ref_t = 0;
+% ref_t = 0;
+load results/RSFC_standard_grad
+load results/RSFC
 
 load('results/FPN_vector.mat');
 load('results/SMLV_vector.mat');
 load('results/Task_negative_vector.mat');
-load('results/Salience_vector.mat');
+load('results/Right_aIns_seed_vector.mat');
 load('results/DAN_vector.mat');
 load('results/VAN_vector.mat');
 load('results/LAN_vector.mat');
@@ -500,7 +536,23 @@ load('results/Lateralized_index.mat');
 load('results/Group_CAPs.mat');
 load('results/Yeo_7networks.mat');
 
-for n_dm = 2
+for n_dm = 1:5
+    if n_dm == 1
+        %%% principal DM
+        ref_t = 27;
+    elseif n_dm == 3
+        ref_t = 31;
+    elseif n_dm == 5
+        ref_t = 44.5;
+    elseif n_dm == 2
+        ref_t = 56.5;
+    elseif n_dm == 4
+        ref_t = 14;
+    else
+        ref_t = 0;
+    end
+    
+    
     corr_time_series_PrincipalGradient_DMN = zeros(1,frame_num+1);
     corr_time_series_SecondGradient = zeros(1,frame_num+1);
     corr_time_series_DMN = zeros(1,frame_num+1);
@@ -523,6 +575,10 @@ for n_dm = 2
     lambda_conjugate1 = lambda(DM_conjugate1_num);
     lambda_conjugate2 = lambda(DM_conjugate2_num);
     
+    phase_lambda = angle(lambda_conjugate1);
+    period = 1.5 * 2 * pi/phase_lambda;
+    fprintf('The period of DM #%d: (period) %.2fs, (freq) %.6fHz \n',n_dm,period,1/period);
+    
     RSFC_grad_temp = RSFC_grad(1:N,:);
     
     for frame = 0:1:frame_num
@@ -535,7 +591,7 @@ for n_dm = 2
         corr_time_series_PrincipalGradient_DMN(frame+1) = -r(2);
         
         r = corrcoef(eigenstate,RSFC_grad_temp(:,2));
-        corr_time_series_SecondGradient(frame+1) = -r(2);
+        corr_time_series_SecondGradient(frame+1) = r(2);
         
         r = corrcoef(eigenstate,Task_negative_vector);
         corr_time_series_DMN(frame+1) = r(2);
@@ -605,18 +661,29 @@ for n_dm = 2
     ylabel('correlation');
 end
 
-%% RSFC grad correlation time course (Yeo 17)
+%% RSFC grad correlation time course (subcortical gradient)
 frame_dt = 0.5;
 frame_num = 200;
 TRtarget = 1.5;
-N = 360;
+N = 716;
 
-load('results/Yeo_17networks.mat');
+load results/RSFC_subcortical_grad
 
-for n_dm = 1:9 %1:5
-    corr_time_series_Yeo_17network = zeros(17,frame_num+1);
+for n_dm = 1
     
-    Phi_DM_mag = abs(Phi_sorted(1:N,2*n_dm));
+    if n_dm == 1
+        %%% principal DM
+        ref_t = 27;
+    else
+        ref_t = 0;
+    end
+    
+    corr_time_series_hippocampus = zeros(1,frame_num+1);
+    corr_time_series_thalamus = zeros(1,frame_num+1);
+    corr_time_series_striatum = zeros(1,frame_num+1);
+    corr_time_series_cerebellum = zeros(1,frame_num+1);
+    corr_time_series_amygdala = zeros(1,frame_num+1);
+    corr_time_series_brainstem = zeros(1,frame_num+1);
     
     DM_conjugate1_num = 2*(n_dm-1)+1;
     DM_conjugate2_num = 2*n_dm;
@@ -624,180 +691,48 @@ for n_dm = 1:9 %1:5
     lambda_conjugate1 = lambda(DM_conjugate1_num);
     lambda_conjugate2 = lambda(DM_conjugate2_num);
     
-    RSFC_grad_temp = RSFC_grad(1:N,:);
-    
     for frame = 0:1:frame_num
         eigenstate = zeros(N,1);
         for roi=1:N 
-            eigenstate(roi)= real((lambda_conjugate1^(frame*frame_dt/TRtarget))*Phi_sorted(roi,DM_conjugate1_num) + (lambda_conjugate2^(frame*frame_dt/TRtarget))*Phi_sorted(roi,DM_conjugate2_num));
+            eigenstate(roi)= real((lambda_conjugate1^((frame*frame_dt+ref_t)/TRtarget))*Phi_sorted(roi,DM_conjugate1_num) + (lambda_conjugate2^((frame*frame_dt+ref_t)/TRtarget))*Phi_sorted(roi,DM_conjugate2_num));
         end
         
-       
+        n_grad = 1;
         
-        for n_cap = 1:17
-            r = corrcoef(eigenstate,Yeo_17network_all_vector(:,n_cap));
-            corr_time_series_Yeo_17network(n_cap,frame+1) = r(2);
-        end
+        r = corrcoef(eigenstate(target_roi_idx_hippocampus),RSFC_grad_hippocampus(:,n_grad));
+        corr_time_series_hippocampus(frame+1) = r(2);
+        r = corrcoef(eigenstate(target_roi_idx_thalamus),RSFC_grad_thalamus(:,n_grad));
+        corr_time_series_thalamus(frame+1) = r(2);
+        r = corrcoef(eigenstate(target_roi_idx_striatum),RSFC_grad_striatum(:,n_grad));
+        corr_time_series_striatum(frame+1) = r(2);
+        r = corrcoef(eigenstate(target_roi_idx_cerebellum),RSFC_grad_cerebellum(:,n_grad));
+        corr_time_series_cerebellum(frame+1) = r(2);
+        r = corrcoef(eigenstate(target_roi_idx_amygdala),RSFC_grad_amygdala(:,n_grad));
+        corr_time_series_amygdala(frame+1) = r(2);
+        r = corrcoef(eigenstate(target_roi_idx_brainstem),RSFC_grad_brainstem(:,n_grad));
+        corr_time_series_brainstem(frame+1) = r(2);
+        
     end
     
     figure; hold on;
-    for n_cap = 1:7
-        plot(frame_dt*(0:1:frame_num),corr_time_series_Yeo_17network(n_cap,:),'LineWidth',2);
-    end
+    plot(frame_dt*(0:1:frame_num),corr_time_series_hippocampus,'LineWidth',2);
+    plot(frame_dt*(0:1:frame_num),corr_time_series_amygdala,'LineWidth',2);
+    plot(frame_dt*(0:1:frame_num),corr_time_series_thalamus,'LineWidth',2);
+    plot(frame_dt*(0:1:frame_num),corr_time_series_striatum,'LineWidth',2);
+    plot(frame_dt*(0:1:frame_num),corr_time_series_brainstem,'LineWidth',2);
+    plot(frame_dt*(0:1:frame_num),corr_time_series_cerebellum,'LineWidth',2);
     
-    for n_cap = 8:14
-        plot(frame_dt*(0:1:frame_num),corr_time_series_Yeo_17network(n_cap,:),'-.','LineWidth',2);
-    end
+    result_agg = [corr_time_series_hippocampus',...
+                  corr_time_series_amygdala',...
+                  corr_time_series_thalamus',...
+                  corr_time_series_striatum',...
+                  corr_time_series_brainstem',...
+                  corr_time_series_cerebellum'];
     
-    for n_cap = 15:17
-        plot(frame_dt*(0:1:frame_num),corr_time_series_Yeo_17network(n_cap,:),':','LineWidth',2);
-    end
-    
-%     legend('Principal Grad','Second Grad','PCC seed','FPN','salience','SMLV','D attention','V attention','Lateralized index');
     yline(0.7,'k--');
-
-
-    legend('Yeo1','Yeo2','Yeo3','Yeo4','Yeo5','Yeo6','Yeo7','Yeo8','Yeo9','Yeo10',...
-        'Yeo11','Yeo12','Yeo13','Yeo14','Yeo15','Yeo16','Yeo17','Location','southeast');
-%     legend('Principal Grad','Lateralized index','Location','southeast');
-%     legend('Principal Grad','FPN','Salience','threshold');
-    xlabel('time (t)');
-    ylabel('correlation');
-end
-
-%% RSFC grad correlation time course (check)
-frame_dt = 0.5;
-frame_num = 200;
-TRtarget = 1.5;
-N = 360;
-thres = 0.7;
-
-load('results/FPN_vector.mat');
-load('results/SMLV_vector.mat');
-load('results/Task_negative_vector.mat');
-load('results/Salience_vector.mat');
-load('results/DAN_vector.mat');
-load('results/VAN_vector.mat');
-load('results/LAN_vector.mat');
-load('results/Lateralized_index.mat');
-load('results/Group_CAPs.mat');
-load('results/Yeo_7networks.mat');
-
-
-for n_dm = 1:9 %1:5
-    corr_time_series_PrincipalGradient_DMN = zeros(1,frame_num+1);
-    corr_time_series_SecondGradient = zeros(1,frame_num+1);
-    corr_time_series_DMN = zeros(1,frame_num+1);
-    corr_time_series_D_attention = zeros(1,frame_num+1);
-    corr_time_series_V_attention = zeros(1,frame_num+1);
-    corr_time_series_executive = zeros(1,frame_num+1);
-    corr_time_series_salience = zeros(1,frame_num+1);
-    corr_time_series_SMLV = zeros(1,frame_num+1);
-    corr_time_series_LAN = zeros(1,frame_num+1);
-    corr_time_series_MLI = zeros(1,frame_num+1);
-    
-    corr_time_series_CAP = zeros(size(CAPs,1),frame_num+1);
-    
-    corr_time_series_Yeo_7network = zeros(7,frame_num+1);
-    
-    Phi_DM_mag = abs(Phi_sorted(1:N,2*n_dm));
-    
-    DM_conjugate1_num = 2*(n_dm-1)+1;
-    DM_conjugate2_num = 2*n_dm;
-    
-    lambda_conjugate1 = lambda(DM_conjugate1_num);
-    lambda_conjugate2 = lambda(DM_conjugate2_num);
-    
-    RSFC_grad_temp = RSFC_grad(1:N,:);
-    
-    for frame = 0:1:frame_num
-        eigenstate = zeros(N,1);
-        for roi=1:N 
-            eigenstate(roi)= real((lambda_conjugate1^(frame*frame_dt/TRtarget))*Phi_sorted(roi,DM_conjugate1_num) + (lambda_conjugate2^(frame*frame_dt/TRtarget))*Phi_sorted(roi,DM_conjugate2_num));
-        end
-        
-        r = corrcoef(eigenstate,RSFC_grad_temp(:,1));
-        corr_time_series_PrincipalGradient_DMN(frame+1) = -r(2);
-        
-        r = corrcoef(eigenstate,RSFC_grad_temp(:,2));
-        corr_time_series_SecondGradient(frame+1) = -r(2);
-        
-        r = corrcoef(eigenstate,Task_negative_vector);
-        corr_time_series_DMN(frame+1) = r(2);
-        
-        r = corrcoef(eigenstate,DAN_vector);
-        corr_time_series_D_attention(frame+1) = r(2);
-        
-        r = corrcoef(eigenstate,VAN_vector);
-        corr_time_series_V_attention(frame+1) = r(2);
-        
-        r = corrcoef(eigenstate,FPN_vector);
-        corr_time_series_executive(frame+1) = r(2);
-        
-        r = corrcoef(eigenstate,Salience_vector);
-        corr_time_series_salience(frame+1) = r(2);
-        
-        r = corrcoef(eigenstate,SMLV_vector);
-        corr_time_series_SMLV(frame+1) = r(2);
-        
-        r = corrcoef(eigenstate,LAN_vector);
-        corr_time_series_LAN(frame+1) = r(2);
-        
-        r = corrcoef(eigenstate,MLI);
-        corr_time_series_MLI(frame+1) = r(2);
-        
-        for n_cap = 1:size(CAPs,1)
-            r = corrcoef(eigenstate,CAPs(n_cap,:)');
-            corr_time_series_CAP(n_cap,frame+1) = r(2);
-        end
-        
-        for n_cap = 1:7
-            r = corrcoef(eigenstate,Yeo_7network_all_vector(:,n_cap));
-            corr_time_series_Yeo_7network(n_cap,frame+1) = r(2);
-        end
-    end
-    
-    if max(corr_time_series_PrincipalGradient_DMN)>thres
-        disp(['DM number #',num2str(n_dm,'%03d'), ': Grad 1'])
-    end
-    if max(corr_time_series_SecondGradient)>thres
-        disp(['DM number #',num2str(n_dm,'%03d'), ': Grad 2'])
-    end
-    if max(corr_time_series_DMN)>thres
-        disp(['DM number #',num2str(n_dm,'%03d'), ': Default mode (PCC seed)'])
-    end
-    if max(corr_time_series_D_attention)>thres
-        disp(['DM number #',num2str(n_dm,'%03d'), ': Dorsal attention'])
-    end
-    if max(corr_time_series_V_attention)>thres
-        disp(['DM number #',num2str(n_dm,'%03d'), ': Ventral attention'])
-    end
-    if max(corr_time_series_SMLV)>thres
-        disp(['DM number #',num2str(n_dm,'%03d'), ': Sensorimotor seed'])
-    end
-    if max(corr_time_series_executive)>thres
-        disp(['DM number #',num2str(n_dm,'%03d'), ': Executive'])
-    end
-    if max(corr_time_series_salience)>thres
-        disp(['DM number #',num2str(n_dm,'%03d'), ': Salience'])
-    end
-    if max(corr_time_series_LAN)>thres
-        disp(['DM number #',num2str(n_dm,'%03d'), ': Language'])
-    end
-    if max(corr_time_series_MLI)>thres
-        disp(['DM number #',num2str(n_dm,'%03d'), ': Lateralized'])
-    end
-    
-    for n_cap = 1:size(CAPs,1)
-        if max(corr_time_series_CAP(n_cap,:))>thres
-            disp(['DM number #',num2str(n_dm,'%03d'), ': CAP(PCC)-',num2str(n_cap)])
-        end
-    end
-    for n_cap = 1:7
-        if max(corr_time_series_Yeo_7network(n_cap,:))>thres
-            disp(['DM number #',num2str(n_dm,'%03d'), ': Yeo 7network-',num2str(n_cap)])
-        end
-    end
+    hold off;
+    ylim([-1,1]);
+    legend('Hippocampus','Thalamus','Striatum','Cerebellum','Amygdala','Brainstem');
 end
 
 %% dFC
@@ -841,7 +776,7 @@ for n_dm = 1:1
     index_tril = tril(ones(size(Phi_DM_ang_mat)),-1);
     Phi_DM_ang_vector = Phi_DM_ang_mat(index_tril ~= 0);
 
-    dFC = dstd_group;
+    dFC = dstd_group_45;
 %     dFC = execursion_group;
     dFC(logical(eye(size(dFC)))) = nan;
 
@@ -859,8 +794,10 @@ for n_dm = 1:1
     
     pred_dFC(logical(eye(size(dFC)))) = nan;
     pred_dFC_vector = pred_dFC(index_tril ~= 0);
+    dFC_reconstructed_vector = dFC_reconstructed(index_tril ~= 0);
+    dFC_reconstructed_DM1_vector = dFC_reconstructed_DM1(index_tril ~= 0);
     
-    r = corrcoef(pred_dFC_vector,dFC_vector);
+    r = corrcoef(dFC_reconstructed_vector,dFC_vector);
     
     disp(['dFC calculated. The correlation: ',num2str(r(2))]);
     
@@ -869,6 +806,9 @@ for n_dm = 1:1
     [~, idx_sorted] = sort(ci);
     dFC = dFC(idx_sorted, idx_sorted);
     pred_dFC = pred_dFC(idx_sorted, idx_sorted);
+    dFC_reconstructed(logical(eye(size(dFC_reconstructed)))) = nan;
+    dFC_reconstructed_sorted = dFC_reconstructed(idx_sorted, idx_sorted);
+    dFC_reconstructed_DM1_sorted = dFC_reconstructed_DM1(idx_sorted, idx_sorted);
     sorted_ci = ci(idx_sorted); % Sorted community indices
 
     
@@ -916,7 +856,7 @@ for n_dm = 1:1
 
     %%% Plot the second heatmap (Original Group Correlation) using imagesc
     subplot(1,2,2); 
-    imagesc(pred_dFC);
+    imagesc(dFC_reconstructed_sorted);
     colormap(grayMap);
     colorbar;
     axis square;

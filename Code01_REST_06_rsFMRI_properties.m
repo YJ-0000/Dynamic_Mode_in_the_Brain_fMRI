@@ -3,7 +3,42 @@ current_path = pwd;
 load('results/HCP_timeseries_cortical_subcortical_extracted_filtered_meta.mat');
 load('results/HCP_timeseries_cortical_subcortical_extracted_filtered.mat');
 %% Resting-state FC gradient
-% N=360;
+N=360;
+
+corr_mats = zeros(4*size(time_series_denoised_filtered,1),N,N);
+i_num = 0;
+for ii = 1:(4*size(time_series_denoised_filtered,1))
+    disp(ii);
+    nsub = ceil(ii/4); nses = rem(ii,4); if nses==0; nses=4;end
+    if ~isempty(time_series_denoised_filtered{nsub,nses})
+        i_num = i_num + 1;
+        corr_mat = corrcoef(time_series_denoised_filtered{nsub,nses}');
+        corr_mats(i_num,:,:) = corr_mat(1:N,1:N);
+    end
+end
+
+corr_mats = atanh(corr_mats(1:i_num,:,:));
+
+try 
+    label_idx_list;
+catch
+    label_idx_list=1:N;
+end
+
+group_corr_mat = tanh(squeeze(nanmean(corr_mats)));
+group_corr_mat_original = tanh(squeeze(nanmean(corr_mats)));
+
+[~,sort_idx] = sort(abs(group_corr_mat(:)),'descend');
+
+group_corr_mat(sort_idx(length(sort_idx)*0.2:end)) = 0;
+
+
+[coeff, score, latent, tsquared, explained, mu] = pca(group_corr_mat,'NumComponents',5);
+
+RSFC_grad = coeff;
+save results/RSFC_standard_grad RSFC_grad group_corr_mat group_corr_mat_original
+
+%% Resting-state FC gradient (including subcortex)
 N=718;
 
 corr_mats = zeros(4*size(time_series_denoised_filtered,1),N,N);
@@ -68,6 +103,69 @@ corr_mats_global_removed = atanh(corr_mats_global_removed(1:i_num,:,:));
 group_corr_mat_global_removed = tanh(squeeze(nanmean(corr_mats_global_removed)));
 
 save results/RSFC_all group_corr_mat_original group_corr_mat_global_removed
+
+%% Resting-state FC gradient (subcortex)
+load results/RSFC_all
+load('DMs\DM_cortical_subcortical_ext_fbDMD_noROInorm.mat', 'roi_exclude')
+
+group_corr_mat_original(roi_exclude,:) = [];
+group_corr_mat_original(:,roi_exclude) = [];
+
+labels_subcortical = cifti_read('atlas/CortexSubcortex_ColeAnticevic_NetPartition_wSubcorGSR_parcels_LR.dlabel.nii');
+labels_subcortical_data = labels_subcortical.cdata;
+label_idx_list = unique(labels_subcortical_data);
+label_idx_list(label_idx_list==0) = [];
+label_exclude = label_idx_list(roi_exclude);
+label_idx_list(roi_exclude) = [];
+models = labels_subcortical.diminfo{1}.models;
+
+subcortical_areas = {'hippocampus','thalamus','striatum','cerebellum','amygdala','brainstem'};
+structure_model_idx_list = {[14,15],[20,21],[3,4,8,9,18,19],[10,11],[5,6],7};
+for n_area = 1:length(subcortical_areas)
+    structure_model_idx = structure_model_idx_list{n_area};
+    label_select = [];
+    for n_model = structure_model_idx
+        label_select = [label_select;
+            labels_subcortical.cdata(models{1,n_model}.start:(models{1,n_model}.start+models{1,n_model}.count-1))];
+    end
+    label_select = unique(label_select);
+    target_roi_idx = zeros(1,length(label_select));
+    target_exclude = false(1,length(label_select));
+    for n_roi = 1:length(label_select)
+        try
+            target_roi_idx(n_roi) = find(label_idx_list == label_select(n_roi));
+        catch
+            target_exclude(n_roi) = true;
+        end
+    end
+    label_select(target_exclude) = [];
+    target_roi_idx(target_exclude) = [];
+
+    C = group_corr_mat_original(target_roi_idx,:);
+    C(:,target_roi_idx) = [];
+    
+    S = corrcoef(C');
+
+    [coeff, ~, latent, tsquared, explained, mu] = pca(S,'NumComponents',5);
+    fprintf('%s -- Variance explained by PC1: %.3f, PC2:  %.3f \n',subcortical_areas{n_area},explained(1),explained(2))
+    
+    if n_area ~= 2
+        coeff = -coeff;
+    end
+    
+    gradient_cifti_data = zeros(size(labels_subcortical_data));
+    for n_roi = 1:length(label_select)
+        gradient_cifti_data(labels_subcortical_data==label_select(n_roi)) = coeff(n_roi,1);
+    end
+    fprintf('Plot info > min: %.5f, max: %.5f \n',min(coeff(:,1)), max(coeff(:,1)));
+    plot_subcortex(gradient_cifti_data,['results/RSFC_',subcortical_areas{n_area},'_grad.jpg'],[],min(coeff(:,1)),max(coeff(:,1)),subcortical_areas{n_area});
+    
+    eval(['RSFC_grad_',subcortical_areas{n_area},'=coeff;']);
+    eval(['target_roi_idx_',subcortical_areas{n_area},'=target_roi_idx;']);
+
+end
+
+save results/RSFC_subcortical_grad RSFC_grad_* subcortical_areas structure_model_idx_list target_roi_idx_*
 
 %% Yeo 7 network partition
 % Parameters
@@ -243,7 +341,7 @@ save results/SMLV_vector SMLV_vector
 N = 360;
 labels = cifti_read('atlas/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii');
 
-area_seed = mean(group_corr_mat_global_removed(1:N,[111,111+180]),2);
+area_seed = mean(group_corr_mat_global_removed(1:N,[111]),2);
 % precu_seed(abs(precu_seed)<0.2) = 0;
 
 FPN_grad = zeros(size(labels.cdata));
@@ -254,7 +352,7 @@ end
 lag1 = cifti_struct_create_from_template(labels, FPN_grad, 'dscalar');
 cifti_write(lag1, ['results/RSFC_Salience.dscalar.nii']);
 
-save results/Salience_vector Salience_vector
+save results/Right_aIns_seed_vector Salience_vector
 
 %% FEF seed FC (Dorsal attention)
 N = 360;
@@ -325,8 +423,8 @@ for ii = 1:(4*size(time_series_denoised_filtered,1))
         time_series_matrix = time_series_denoised_filtered{nsub,nses};
         time_series_matrix = time_series_matrix(1:N,:);
         
-        GS_L = mean(time_series_matrix(1:N/2,:));
-        GS_R = mean(time_series_matrix(N/2+1:end,:));
+        GS_R = mean(time_series_matrix(1:N/2,:));
+        GS_L = mean(time_series_matrix(N/2+1:end,:));
         
         DLI = zeros(N,1);
     
@@ -886,14 +984,22 @@ labels = cifti_read('atlas/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Fi
 atlasimage=niftiread('atlas/MMP_in_MNI_symmetrical_LR_diff.nii');
 atlasinfo=niftiinfo('atlas/MMP_in_MNI_symmetrical_LR_diff.nii');
 
+atlasimage_temp = atlasimage;
+for n_roi = 1:(N_cortex/2)
+    atlasimage(atlasimage_temp==n_roi) = n_roi + 180;
+end
+for n_roi = ((N_cortex/2)+1):N_cortex
+    atlasimage(atlasimage_temp==n_roi) = n_roi - 180;
+end
+
 try
     label_idx_list;
 catch
     label_idx_list = 1:N;
 end
 
-mkdir('results/QPP_noGSR');
-save_dir = [pwd filesep 'results/QPP_noGSR'];
+mkdir('results/QPP_GSR');
+save_dir = [pwd filesep 'results/QPP_GSR'];
 
 frame_dt = 0.72;
 N = 360;

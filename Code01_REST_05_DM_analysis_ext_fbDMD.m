@@ -2,6 +2,7 @@ clear; clc;
 current_path = pwd;
 conn;
 close all;
+%%
 load('results/HCP_timeseries_cortical_subcortical_extracted_filtered_meta.mat');
 load('results/HCP_timeseries_cortical_subcortical_extracted_filtered.mat');
 %%
@@ -98,11 +99,22 @@ Phi_all = [Phi_sorted,Phi_rest];
 save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm Phi_sorted lambda A roi_exclude Phi_all
 
 %%
+
+N_cortex = 360;
 cd(current_path);
 labels = cifti_read('atlas/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii');
 
 atlasimage=niftiread('atlas/MMP_in_MNI_symmetrical_LR_diff.nii');
 atlasinfo=niftiinfo('atlas/MMP_in_MNI_symmetrical_LR_diff.nii');
+
+atlasimage_temp = atlasimage;
+for n_roi = 1:(N_cortex/2)
+    atlasimage(atlasimage_temp==n_roi) = n_roi + 180;
+end
+for n_roi = ((N_cortex/2)+1):N_cortex
+    atlasimage(atlasimage_temp==n_roi) = n_roi - 180;
+end
+
 
 try
     label_idx_list;
@@ -115,7 +127,20 @@ save_dir = [pwd filesep 'DM_video_HCP_REST_fbDMD'];
 
 frame_dt = 0.5;
 
-for pair_num = 3
+for pair_num = 1:5
+    if pair_num == 1
+        ref_t = 27;
+    elseif pair_num == 3
+        ref_t = 31;
+    elseif pair_num == 5
+        ref_t = 44.5;
+    elseif pair_num == 2
+        ref_t = 56.5;
+    elseif pair_num == 4
+        ref_t = 14;
+    else
+        ref_t = 0;
+    end
     
     cd(save_dir);
     mkdir(['DM_pair', num2str(pair_num) '_4view']);
@@ -129,10 +154,12 @@ for pair_num = 3
     lambda_conjugate1 = lambda(DM_conjugate1_num);
     lambda_conjugate2 = lambda(DM_conjugate2_num);
     
-    for frame = 41:1:100
+    for frame = 1:1:100
         eigenstate = zeros(size(atlasimage));
         for roi=1:N 
-            eigenstate(atlasimage==label_idx_list(roi))= real((lambda_conjugate1^(frame*frame_dt/TRtarget))*Phi_sorted(roi,DM_conjugate1_num) + (lambda_conjugate2^(frame*frame_dt/TRtarget))*Phi_sorted(roi,DM_conjugate2_num));
+            eigenstate(atlasimage==label_idx_list(roi)) ...
+                = real(((lambda_conjugate1^((frame*frame_dt+ref_t)/TRtarget))/abs(lambda_conjugate1^(ref_t/TRtarget)))*Phi_sorted(roi,DM_conjugate1_num) ...
+                    + ((lambda_conjugate2^((frame*frame_dt+ref_t)/TRtarget))/abs(lambda_conjugate2^(ref_t/TRtarget)))*Phi_sorted(roi,DM_conjugate2_num));
         end
         
         atlasinfo.Datatype='double';
@@ -141,9 +168,12 @@ for pair_num = 3
         fh = conn_mesh_display(['DM_pair', num2str(pair_num), '_', num2str(frame,'%04d'), '.nii']);
         fh('colormap','bluewhitered');
         fh('colorbar','on');
-%         fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num)))/3,max(abs(Phi_sorted(:,DM_conjugate1_num)))/3]);
-        fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num)))/2,max(abs(Phi_sorted(:,DM_conjugate1_num)))/2]);
-%         fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num))),max(abs(Phi_sorted(:,DM_conjugate1_num)))]);
+        if pair_num == 1
+            fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num)))/3,max(abs(Phi_sorted(:,DM_conjugate1_num)))/3]);
+%             fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num)))/2,max(abs(Phi_sorted(:,DM_conjugate1_num)))/2]);
+        else
+            fh('colorbar','rescale',[-max(abs(Phi_sorted(:,DM_conjugate1_num))),max(abs(Phi_sorted(:,DM_conjugate1_num)))]);
+        end
         fh('print',4,['DM_pair', num2str(pair_num), '_', num2str(frame,'%04d'),'.jpg'],'-r150','-nogui') 
         
         close;
@@ -202,14 +232,22 @@ U=Phi_sorted(:,1:num_DMs);
 V=pinv(U);
 residual_matrix = eye(size(U,1)) - U*V;
 D=zeros(num_DMs+1,length(tau));
+B_mean=zeros(num_DMs,length(tau));
+B_var=zeros(num_DMs,length(tau));
+    
+global_Phi = mean(Phi_sorted(:,1:2:num_DMs))';
+corr_global_signal = zeros(num_DMs/2,length(tau));
+corr_global_signal_normalized = zeros(num_DMs/2,length(tau));
+corr_global_signal_main_two = zeros(1,length(tau));
+corr_global_signal_main_two_normalized = zeros(1,length(tau));
 for n=1:length(tau)
     if tau(n) == 0
         continue;
     end
     
     disp(['start: sub#' num2str(n)]);
-    C_temp = zeros(num_DMs+1,num_DMs+1);
-    B_temp = zeros(num_DMs+1,1);
+    Z_temp = zeros(num_DMs+1,num_DMs+1);
+    W_temp = zeros(num_DMs+1,1);
     
     tic
     tau_n = sum(tau(1:n-1));
@@ -217,25 +255,45 @@ for n=1:length(tau)
     Y_temp = Y(:,tau_n+1:tau_n+tau(n));
     resid_Y_temp = residual_matrix * Y_temp;
     VY = V(1:num_DMs,:) * Y_temp;
-    C_temp(1,1) = sum(dot(resid_Y_temp, resid_Y_temp, 1));
+    Z_temp(1,1) = sum(dot(resid_Y_temp, resid_Y_temp, 1));
     for j=1:num_DMs
-        C_temp(1,j+1) = sum(dot(U(:,j)'*resid_Y_temp, VY(j,:), 1));
+        Z_temp(1,j+1) = sum(dot(U(:,j)'*resid_Y_temp, VY(j,:), 1));
     end
-    C_temp(2:end,1) = C_temp(1,2:end)';
+    Z_temp(2:end,1) = Z_temp(1,2:end)';
     for i=1:num_DMs
         for j=1:num_DMs  
-            C_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
+            Z_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
         end
     end
-    B_temp(1) = sum(dot(resid_Y_temp,X_temp,1));
+    W_temp(1) = sum(dot(resid_Y_temp,X_temp,1));
     for k=1:num_DMs
-        B_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
+        W_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
     end
-    toc
 
-    D(:,n) = C_temp\B_temp;
+    D(:,n) = Z_temp\W_temp;
+    B_mean(:,n) = mean(abs(VY),2);
+    B_var(:,n) = var(abs(VY),[],2);
+    
+    global_signal = mean(Y_temp);
+    engagement_timeseries = real(VY(1:2:end,:) .* global_Phi);
+    r = corrcoef([global_signal',engagement_timeseries']);
+    corr_global_signal(:,n) = r(1,2:end);
+    
+    r = corrcoef([global_signal',sum(engagement_timeseries([1,3],:))']);
+    corr_global_signal_main_two(n) = r(2);
+    
+    engagement_ratio_timeseries = real(VY(1:2:end,:).* global_Phi)./sum(abs(real(VY(1:2:end,:).* global_Phi)));
+    r = corrcoef([global_signal',engagement_ratio_timeseries']);
+    corr_global_signal_normalized(:,n) = r(1,2:end);
+    
+    r = corrcoef([global_signal',sum(engagement_ratio_timeseries([1,3],:))']);
+    corr_global_signal_main_two_normalized(n) = r(2);
+    
+    toc
+    
     disp(['end: sub#' num2str(n)]);
 end
 
-save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10 tau Phi_sorted lambda D sub_ids num_DMs
+save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B tau Phi_sorted lambda D B_mean B_var sub_ids num_DMs
 
+save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_global_signal corr_global_signal*
