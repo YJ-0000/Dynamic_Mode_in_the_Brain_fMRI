@@ -1,24 +1,30 @@
 clear; clc; close all;
+current_path = pwd;
 
-test_for = 'phase'; % magnitude or phase
+test_for = 'phase'; % B, magnitude or phase
 
 %% Load data
 % Load Resting State Data
-load('DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10.mat');
+load('DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B.mat');
 D_rest = D(2:end, tau ~= 0).^(0.72/1.5);
 sub_ids_rest = sub_ids(tau ~= 0);
+B_rest = B_mean(:, tau ~= 0);
+B_rest = B_rest./sum(B_rest);
 
 % List of task files and names
 % task_names = {'WM','EMOTION','MOTOR','LANGUAGE','GAMBLING','SOCIAL','RELATIONAL'};
 task_names = {'EMOTION','GAMBLING','LANGUAGE','MOTOR','RELATIONAL','SOCIAL','WM'};
 num_tasks = length(task_names);
 D_tasks = cell(1, num_tasks);
+B_tasks = cell(1, num_tasks);
 sub_ids_tasks = cell(1, num_tasks);
 
 % Load Task Data
 for i = 1:num_tasks
-    load(['DMs\DM_tfMRI_', task_names{i} ,'_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10.mat']);
+    load(['DMs\DM_tfMRI_', task_names{i} ,'_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B.mat']);
     D_tasks{i} = D(2:end, tau ~= 0);
+    B_tasks{i} = B(:, tau ~= 0);
+    B_tasks{i} = B_tasks{i}./sum(B_tasks{i});
     sub_ids_tasks{i} = sub_ids(tau ~= 0);
 end
 
@@ -31,16 +37,18 @@ end
 % Subset Rest Data to Common Subjects
 [~, idx_rest] = ismember(common_sub_ids, sub_ids_rest);
 D_rest = D_rest(:, idx_rest);
+B_rest = B_rest(:, idx_rest);
 sub_ids_rest = sub_ids_rest(idx_rest);
 
 % Subset Task Data to Common Subjects
 for i = 1:num_tasks
     [~, idx_task] = ismember(common_sub_ids, sub_ids_tasks{i});
     D_tasks{i} = D_tasks{i}(:, idx_task);
+    B_tasks{i} = B_tasks{i}(:, idx_task);
     sub_ids_tasks{i} = sub_ids_tasks{i}(idx_task);
 end
-%% coefficients
-idx_order = [1,5,9,7,3];
+%% coefficients - magnitude
+idx_order = [1,5,9,3,7];
 
 figure; 
 subplot(2,4,1);
@@ -54,6 +62,20 @@ for ii = 1:7
     ylim([0.94,1]);
 end
 
+%% coefficients - angle
+idx_order = [1,5,9,3,7];
+
+figure; 
+subplot(2,4,1);
+bar(mean(angle(D_rest(idx_order,:)),2));
+title('REST');
+ylim([0,0.08]);
+for ii = 1:7
+    subplot(2,4,ii+1);
+    bar(mean(angle(D_tasks{ii}(idx_order,:)),2));
+    title(task_names{ii});
+    ylim([0,0.08]);
+end
 %% t-test
 % Normalize D
 % normalized_D_rest = abs(D_rest(1:2:end,:)) ./ mean(abs(D_rest(1:2:end,:)), 2);
@@ -63,23 +85,29 @@ end
 % end
 
 if strcmp(test_for,'magnitude')
-    normalized_D_rest = abs(D_rest(idx_order,:)) ;
-    normalized_D_tasks = cell(1, num_tasks);
+    normalized_metric_rest = abs(D_rest(idx_order,:)) ;
+    normalized_metric_tasks = cell(1, num_tasks);
     for i = 1:num_tasks
-        normalized_D_tasks{i} = abs(D_tasks{i}(idx_order,:)) ;
+        normalized_metric_tasks{i} = abs(D_tasks{i}(idx_order,:)) ;
     end
 elseif strcmp(test_for,'phase')
-    normalized_D_rest = angle(D_rest(idx_order,:));
-    normalized_D_tasks = cell(1, num_tasks);
+    normalized_metric_rest = angle(D_rest(idx_order,:));
+    normalized_metric_tasks = cell(1, num_tasks);
     for i = 1:num_tasks
-        normalized_D_tasks{i} = angle(D_tasks{i}(idx_order,:));
+        normalized_metric_tasks{i} = angle(D_tasks{i}(idx_order,:));
+    end
+elseif strcmp(test_for,'B')
+    normalized_metric_rest = (B_rest(idx_order,:));
+    normalized_metric_tasks = cell(1, num_tasks);
+    for i = 1:num_tasks
+        normalized_metric_tasks{i} = (B_tasks{i}(idx_order,:));
     end
 else
-    error('Magnitude or phase??')
+    error('B, Magnitude or phase??')
 end
 
 % Number of modes
-n_modes = size(normalized_D_rest, 1);
+n_modes = size(normalized_metric_rest, 1);
 
 % Initialize variables to store t-test results
 p_values_rest_vs_tasks = zeros(n_modes, num_tasks);
@@ -90,9 +118,9 @@ t_stats_tasks_vs_tasks = zeros(n_modes, num_tasks, num_tasks);
 
 % Perform t-test between Rest and each Task for each mode
 for mode_idx = 1:n_modes
-    rest_data = normalized_D_rest(mode_idx, :);
+    rest_data = normalized_metric_rest(mode_idx, :);
     for task_idx = 1:num_tasks
-        task_data = normalized_D_tasks{task_idx}(mode_idx, :);
+        task_data = normalized_metric_tasks{task_idx}(mode_idx, :);
         [~, p, ~, stats] = ttest(rest_data, task_data);
         p_values_rest_vs_tasks(mode_idx, task_idx) = p;
         t_stats_rest_vs_tasks(mode_idx, task_idx) = stats.tstat;
@@ -102,9 +130,9 @@ end
 % Perform t-test between each pair of Tasks for each mode
 for mode_idx = 1:n_modes
     for task_idx1 = 1:num_tasks
-        data1 = normalized_D_tasks{task_idx1}(mode_idx, :);
+        data1 = normalized_metric_tasks{task_idx1}(mode_idx, :);
         for task_idx2 = task_idx1+1:num_tasks
-            data2 = normalized_D_tasks{task_idx2}(mode_idx, :);
+            data2 = normalized_metric_tasks{task_idx2}(mode_idx, :);
             [~, p, ~, stats] = ttest(data1, data2);
             p_values_tasks_vs_tasks(mode_idx, task_idx1, task_idx2) = p;
             t_stats_tasks_vs_tasks(mode_idx, task_idx1, task_idx2) = stats.tstat;
@@ -148,29 +176,23 @@ p_values_tasks_vs_tasks_bonf(p_values_tasks_vs_tasks_bonf > 1) = 1;
 p_values_tasks_vs_tasks_bonf(p_values_tasks_vs_tasks_bonf == 0) = NaN;
 
 %% Visualization using heatmap
+save_dir = 'visualize';
+cd(current_path);
+mkdir(save_dir);
+
 task_names = {'Emotional','Gambling','Language','Motor','Relational','Social','N-back'};
 
 alpha = 0.05; % Significance level
 
-n = 256; % Number of colors
-half = floor(n/2);
-    
-% Blue to white
-cmap1 = [linspace(0,1,half)', linspace(0,1,half)', linspace(1,1,half)'];
-
-% White to red
-cmap2 = [linspace(1,1,n-half)', linspace(1,0,n-half)', linspace(1,0,n-half)'];
-
-% Combine to create red-white-blue colormap
-redWhiteBlue = [cmap1; cmap2];
+load results/colormap_coolwarm
 
 % Rest vs Tasks Heatmap
 figure;
 % Create t-value heatmap
 imagesc(-t_stats_rest_vs_tasks);
-colormap(redWhiteBlue);
+colormap(coolwarm);
 colorbar;
-mode_names = {'Principal','CEN-to-DMN','DMN-to-CEN','Bi-asym','FV-to-S'};
+mode_names = {'Principal','SN-to-DMN','SN-to-CEN','FV-to-SM','Bi-asym'};
 caxis([-max(abs(t_stats_rest_vs_tasks(:))), max(abs(t_stats_rest_vs_tasks(:)))]);
 set(gca, 'XTick', 1:num_tasks, 'XTickLabel', task_names, 'YTick', 1:n_modes,'YTickLabel', mode_names);
 % xlabel('Tasks');
@@ -186,14 +208,21 @@ for mode_idx = 1:n_modes
         y = mode_idx;
         p_fdr = p_values_rest_vs_tasks_adj(mode_idx, task_idx);
         p_bonf = p_values_rest_vs_tasks_bonf(mode_idx, task_idx);
-        if p_bonf < alpha
-            text(x, y, '*', 'HorizontalAlignment', 'Center', 'Color', 'k', 'FontSize', 14);
-        elseif p_fdr < alpha
-            text(x, y, '+', 'HorizontalAlignment', 'Center', 'Color', 'k', 'FontSize', 14);
+        if p_bonf < 0.001
+            text(x, y, '***', 'HorizontalAlignment', 'Center', 'Color', 'k', 'FontSize', 14);
+        elseif p_bonf < 0.01
+            text(x, y, '**', 'HorizontalAlignment', 'Center', 'Color', 'k', 'FontSize', 14);
+        elseif p_bonf < 0.05
+            text(x, y, '**', 'HorizontalAlignment', 'Center', 'Color', 'k', 'FontSize', 14);
+%         elseif p_fdr < alpha
+%             text(x, y, '+', 'HorizontalAlignment', 'Center', 'Color', 'k', 'FontSize', 14);
         end
     end
 end
 hold off;
+
+exportgraphics(gca,[save_dir,filesep,test_for,'_REST_vs_task.png'],'Resolution',600)
+
 
 % Tasks vs Tasks Heatmap
 % Prepare data for heatmap
@@ -235,7 +264,7 @@ for fig_idx = 1:num_figures
         imagesc(t_matrix);
         colormap(flipud(jet));
         caxis([-max(abs(t_matrix(:))), max(abs(t_matrix(:)))]);
-        colormap(redWhiteBlue);
+        colormap(coolwarm);
         colorbar;
         title(['Mode ' num2str(mode_idx)]);
         set(gca, 'XTick', 1:num_tasks, 'XTickLabel', task_names, 'XTickLabelRotation', 45);
@@ -249,17 +278,23 @@ for fig_idx = 1:num_figures
                 y = task_idx1;
                 p_fdr = p_fdr_matrix(task_idx1, task_idx2);
                 p_bonf = p_bonf_matrix(task_idx1, task_idx2);
-                if p_bonf < alpha
+                if p_bonf < 0.001
+                    text(x, y, '***', 'HorizontalAlignment', 'Center', 'Color', 'k', 'FontSize', 12);
+                elseif p_bonf < 0.01
+                    text(x, y, '**', 'HorizontalAlignment', 'Center', 'Color', 'k', 'FontSize', 12);
+                elseif p_bonf < 0.05
                     text(x, y, '*', 'HorizontalAlignment', 'Center', 'Color', 'k', 'FontSize', 12);
-                elseif p_fdr < alpha
-                    text(x, y, '+', 'HorizontalAlignment', 'Center', 'Color', 'k', 'FontSize', 12);
+%                 elseif p_fdr < alpha
+%                     text(x, y, '+', 'HorizontalAlignment', 'Center', 'Color', 'k', 'FontSize', 12);
                 end
             end
         end
         hold off;
     end
-    title(['Tasks vs Tasks (Modes ' num2str(mode_start) ' to ' num2str(mode_end) ')']);
+    title(['Tasks vs Tasks -- Modes ' num2str(mode_start)]);
     set(gca, 'FontName', 'Times New Roman', 'FontSize', 20);
+    
+    exportgraphics(gca,[save_dir,filesep,test_for,'_task_vs_task_DM',num2str(fig_idx),'.png'],'Resolution',600)
     
 end
 

@@ -36,11 +36,12 @@ for n_task = 1:length(task_names)
     residual_matrix = eye(size(U,1)) - U*V;
 
     D = zeros(num_DMs+1,size(time_series_preproc_filtered,1));
+    B = zeros(num_DMs,size(time_series_preproc_filtered,1));
     loss_DM_model = zeros(1,size(time_series_preproc_filtered,1));
     for nsub = 1:size(time_series_preproc_filtered,1)
         tau_temp = 0;
         disp(['start: sub#' num2str(nsub)]);
-        X_temp = []; Y_temp = []; C_temp = [];
+        X_temp = []; Y_temp = []; Z_temp = [];
         tic
         for nses = 1:2
             if ~isempty(time_series_preproc_filtered{nsub,nses})
@@ -62,27 +63,28 @@ for n_task = 1:length(task_names)
         end
 
         if tau_temp > 0
-            C_temp = zeros(num_DMs+1,num_DMs+1);
-            B_temp = zeros(num_DMs+1,1);
+            Z_temp = zeros(num_DMs+1,num_DMs+1);
+            W_temp = zeros(num_DMs+1,1);
 
             resid_Y_temp = residual_matrix * Y_temp;
             VY = V(1:num_DMs,:) * Y_temp;
-            C_temp(1,1) = sum(dot(resid_Y_temp, resid_Y_temp, 1));
+            Z_temp(1,1) = sum(dot(resid_Y_temp, resid_Y_temp, 1));
             for j=1:num_DMs
-                C_temp(1,j+1) = sum(dot(U(:,j)'*resid_Y_temp, VY(j,:), 1));
+                Z_temp(1,j+1) = sum(dot(U(:,j)'*resid_Y_temp, VY(j,:), 1));
             end
-            C_temp(2:end,1) = C_temp(1,2:end)';
+            Z_temp(2:end,1) = Z_temp(1,2:end)';
             for i=1:num_DMs
                 for j=1:num_DMs  
-                    C_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
+                    Z_temp(i+1,j+1) = (U(:,i)'*U(:,j))*sum(dot(VY(i,:), VY(j,:), 1));
                 end
             end
-            B_temp(1) = sum(dot(resid_Y_temp,X_temp,1));
+            W_temp(1) = sum(dot(resid_Y_temp,X_temp,1));
             for k=1:num_DMs
-                B_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
+                W_temp(k+1) = sum(dot(U(:,k)*VY(k,:),X_temp,1));
             end
 
-            D(:,nsub) = C_temp\B_temp;
+            D(:,nsub) = Z_temp\W_temp;
+            B(:,nsub) = mean(abs(VY),2);
             disp(['end: sub#' num2str(nsub)]);
 
 
@@ -93,6 +95,6 @@ for n_task = 1:length(task_names)
     end
 
 
-    save(['DMs/DM_tfMRI_',task,'_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10'],'tau', 'D', 'sub_ids')
+    save(['DMs/DM_tfMRI_',task,'_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B'],'tau', 'D', 'B', 'sub_ids')
 
 end

@@ -294,6 +294,8 @@ for ii = 1:3
 
     % Apply the custom 'coolwarm' colormap
     colormap(coolwarm);
+    
+    save results/colormap_coolwarm coolwarm
 
     % Add a colorbar to the figure
     colorbar;
