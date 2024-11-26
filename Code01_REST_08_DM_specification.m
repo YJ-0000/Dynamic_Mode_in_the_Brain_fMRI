@@ -536,6 +536,9 @@ load('results/Lateralized_index.mat');
 load('results/Group_CAPs.mat');
 load('results/Yeo_7networks.mat');
 
+left_hemi_idx = 181:360;
+right_hemi_idx = 1:180;
+
 for n_dm = 1:5
     if n_dm == 1
         %%% principal DM
@@ -563,6 +566,11 @@ for n_dm = 1:5
     corr_time_series_SMLV = zeros(1,frame_num+1);
     corr_time_series_LAN = zeros(1,frame_num+1);
     corr_time_series_MLI = zeros(1,frame_num+1);
+    
+    corr_time_series_PrincipalGradient_left = zeros(1,frame_num+1);
+    corr_time_series_PrincipalGradient_right = zeros(1,frame_num+1);
+    corr_time_series_executive_Yeo7_left = zeros(1,frame_num+1);
+    corr_time_series_executive_Yeo7_right = zeros(1,frame_num+1);
     
     corr_time_series_CAP = zeros(size(CAPs,1),frame_num+1);
     corr_time_series_Yeo_7network = zeros(7,frame_num+1);
@@ -626,6 +634,16 @@ for n_dm = 1:5
             r = corrcoef(eigenstate,Yeo_7network_all_vector(:,n_cap));
             corr_time_series_Yeo_7network(n_cap,frame+1) = r(2);
         end
+        
+        r = corrcoef(eigenstate(left_hemi_idx),RSFC_grad_temp(left_hemi_idx,1));
+        corr_time_series_PrincipalGradient_left(frame+1) = -r(2);
+        r = corrcoef(eigenstate(right_hemi_idx),RSFC_grad_temp(right_hemi_idx,1));
+        corr_time_series_PrincipalGradient_right(frame+1) = -r(2);
+        r = corrcoef(eigenstate(left_hemi_idx),Yeo_7network_all_vector(left_hemi_idx,3));
+        corr_time_series_executive_Yeo7_left(frame+1) = r(2);
+        r = corrcoef(eigenstate(right_hemi_idx),Yeo_7network_all_vector(right_hemi_idx,3));
+        corr_time_series_executive_Yeo7_right(frame+1) = r(2);
+        
     end
     
     figure; hold on;
@@ -648,15 +666,21 @@ for n_dm = 1:5
         plot(frame_dt*(0:1:frame_num),corr_time_series_Yeo_7network(n_cap,:),':','LineWidth',2);
     end
     
+%     plot(frame_dt*(0:1:frame_num),corr_time_series_PrincipalGradient_left,'.','LineWidth',2);
+%     plot(frame_dt*(0:1:frame_num),corr_time_series_PrincipalGradient_right,'.','LineWidth',2);
+%     plot(frame_dt*(0:1:frame_num),corr_time_series_executive_Yeo7_left,'.','LineWidth',2);
+%     plot(frame_dt*(0:1:frame_num),corr_time_series_executive_Yeo7_right,'.','LineWidth',2);
+    
 %     legend('Principal Grad','Second Grad','PCC seed','FPN','salience','SMLV','D attention','V attention','Lateralized index');
     yline(0.7,'k--');
 
 
     legend('Principal Grad','Second Grad','DMN','FPN','salience','Language','D attention','V attention','Lateralized index',...
         'CAP1','CAP2','CAP3','CAP4','CAP5','CAP6','CAP7','CAP8',...
-        'Yeo1-DMN1','Yeo2-SM','Yeo3-CEN','Yeo4-Vis','Yeo5-DAN','Yeo6-VAN','Yeo7-DMN2','Location','southeast');
-%     legend('Principal Grad','Lateralized index','Location','southeast');
-%     legend('Principal Grad','FPN','Salience','threshold');
+        'Yeo1-DMN1','Yeo2-SM','Yeo3-CEN','Yeo4-Vis','Yeo5-DAN','Yeo6-VAN','Yeo7-DMN2',...
+        'Location','southeast');
+    %         'Principal Grad (left)', 'Principal Grad (right)', 'Yeo3-CEN (left)','Yeo3-CEN (right)',...
+
     xlabel('time (t)');
     ylabel('correlation');
 end
