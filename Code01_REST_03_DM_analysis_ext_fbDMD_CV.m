@@ -141,7 +141,7 @@ for n_cv = 1:cv_num
     
     [Phi_sorted,D] = eig(A);
     lambda = diag(D);
-    idx_exclude = (abs(angle(lambda)) < 2*pi*1.5*0.01) | (abs(lambda)>1);
+    idx_exclude = (abs(angle(lambda)) < 2*pi*1.5*0.01) | (abs(angle(lambda)) > 2*pi*1.5*0.1);
     lambda_rest  = lambda(idx_exclude);
     lambda(idx_exclude) = [];
     Phi_rest = Phi_sorted(:,idx_exclude);

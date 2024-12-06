@@ -86,7 +86,7 @@ toc
 
 [Phi_sorted,D] = eig(A);
 lambda = diag(D);
-idx_exclude = (abs(angle(lambda)) < 2*pi*1.5*0.01) | (abs(lambda)>1);
+idx_exclude = (abs(angle(lambda)) < 2*pi*1.5*0.01) | (abs(angle(lambda)) < 2*pi*1.5*0.01) |(abs(lambda)>1);
 lambda(idx_exclude) = [];
 Phi_rest = Phi_sorted(:,idx_exclude);
 Phi_sorted(:,idx_exclude) = [];
