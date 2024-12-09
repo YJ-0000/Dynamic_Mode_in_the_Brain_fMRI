@@ -255,7 +255,7 @@ for pair_num = 2:12
         
         % Calculate current time
         currentTime = 0 + (i - 1) * frame_dt;
-        timeText = sprintf('t=%.1f', currentTime); % Format text
+        timeText = sprintf('t=%.1fs', currentTime); % Format text
 
         % Add text to the image
         position = [20, 20]; % Position of the text (x, y)
