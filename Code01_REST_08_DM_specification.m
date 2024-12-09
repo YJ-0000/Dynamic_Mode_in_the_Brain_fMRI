@@ -408,15 +408,28 @@ for n_dm = 1:1 %1:5
         
     Phi_DM_ang = angle(Phi_sorted(1:N,2*n_dm));
     
-    Phi_DM_ang_mat = Phi_DM_ang - Phi_DM_ang';
+    Phi_DM_ang_mat = Phi_DM_ang' - Phi_DM_ang;
+    Phi_DM_ang_mat(Phi_DM_ang_mat>pi) = Phi_DM_ang_mat(Phi_DM_ang_mat>pi) - 2*pi;
+    Phi_DM_ang_mat(Phi_DM_ang_mat<-pi) = Phi_DM_ang_mat(Phi_DM_ang_mat<-pi) + 2*pi;
     
-    lag_DM = mean(Phi_DM_ang_mat,2);
+    assert(all(Phi_DM_ang_mat<pi,'all') && all(Phi_DM_ang_mat>-pi,'all'))
+    
+    index_tril = tril(true(size(Phi_DM_ang_mat)),-1);
+    
+    Phi_DM_ang_mat_vector = Phi_DM_ang_mat(index_tril);
+    grp_lags_mean_vector = grp_lags_mean(index_tril);
+    
+    [r,p] = corrcoef(Phi_DM_ang_mat_vector,grp_lags_mean_vector);
+    disp(['DM',num2str(n_dm),' - correlation of lag matrix: ',num2str(r(2),'%.6f')]);
+    
+    
+    lag_DM = mean(Phi_DM_ang_mat,1)';
     
     lag_data = mean(grp_lags_mean,1)';
     
     [r,p] = corrcoef(lag_DM,lag_data);
     
-    disp(['DM',num2str(n_dm),' - correlation of lag structure: ',num2str(r(2),'%.6f')]);
+    disp(['DM',num2str(n_dm),' - correlation of lag projection: ',num2str(r(2),'%.6f')]);
     
 %     figure; scatter(lag_DM,lag_data);
     

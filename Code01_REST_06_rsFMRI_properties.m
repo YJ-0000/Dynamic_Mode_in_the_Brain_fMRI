@@ -476,7 +476,7 @@ max_sessions = 4; % Maximum number of sessions per subject
 [num_subs, ~] = size(time_series_denoised_filtered);
 
 % Set analysis parameters
-lags = -3:3;        % Range of TR shifts
+lags = -6:6;        % Range of TR shifts
 tr = 0.72;          % Sampling interval in seconds
 lag_lim = 4;        % Lag limit (in seconds)
 
