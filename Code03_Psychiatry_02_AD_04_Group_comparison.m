@@ -22,6 +22,7 @@ abs_all_B = [(B_list{1}(1:2:end,:)),...
             (B_list{4}(1:2:end,:)),...
             (B_list{5}(1:2:end,:)),...
             (B_list{6}(1:2:end,:))];
+abs_all_B = abs_all_B./sum(abs_all_B);
         
 abs_all_D = abs_all_D';
 angle_all_D = angle_all_D';
@@ -92,6 +93,25 @@ is_slice_timing_corrected = [ones(size(D_list{1},2),1);
                             zeros(size(D_list{4},2),1);
                             ones(size(D_list{5},2),1);
                             zeros(size(D_list{6},2),1);];
+                        
+%% Testing presence of DMs
+disp('AD patient');
+for ii = 1:size(angle_all_D,2)
+    [h,p] = ttest(angle_all_D(is_AD==1,ii));
+    disp(['DM #',num2str(ii),': p = ',num2str(p)])
+end
+
+disp('MCI patient');
+for ii = 1:size(angle_all_D,2)
+    [h,p] = ttest(angle_all_D(is_MCI==1,ii));
+    disp(['DM #',num2str(ii),': p = ',num2str(p)])
+end
+
+disp('Healthy control');
+for ii = 1:size(angle_all_D,2)
+    [h,p] = ttest(angle_all_D(is_CN==1,ii));
+    disp(['DM #',num2str(ii),': p = ',num2str(p)])
+end
 %% T-test
 disp('########### T-test ###########')
 % Define explanatory variables

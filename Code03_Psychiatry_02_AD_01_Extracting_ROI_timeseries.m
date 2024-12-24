@@ -43,6 +43,14 @@ label_cortical_file = 'atlas/MMP_cortex_resample_AD.nii';
 label_subcortical_file = 'atlas/CortexSubcortex_nifti_resample_AD.nii';
 
 label_cortex = niftiread(label_cortical_file);
+N_cortex = 360;
+atlasimage_temp = label_cortex;
+for n_roi = 1:(N_cortex/2)
+    label_cortex(atlasimage_temp==n_roi) = n_roi + 180;
+end
+for n_roi = ((N_cortex/2)+1):N_cortex
+    label_cortex(atlasimage_temp==n_roi) = n_roi - 180;
+end
 label_subcortical = niftiread(label_subcortical_file);
 
 label_subcortical_file_original = 'atlas/CortexSubcortex_ColeAnticevic_NetPartition_wSubcorGSR_parcels_LR_nifti.nii';
