@@ -13,7 +13,7 @@ catch
     label_data = label_cortical_data;
 end
 
-HCP_denoised_path = 'G:\HCP_3T_denoised';
+load secure_data/path_info;
 cd(HCP_denoised_path);
 folder_denoised_list = dir('*_fixextended');
 folder_denoised_list = folder_denoised_list([folder_denoised_list.isdir]);

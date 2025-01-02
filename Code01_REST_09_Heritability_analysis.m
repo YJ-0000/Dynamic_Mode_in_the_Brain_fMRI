@@ -15,9 +15,10 @@ sub_ids(tau<2000) = [];
 % tau(tau<2000) = [];
 
 %%
-gene_data_table = readtable('data/RESTRICTED_tbk5452_10_15_2024_18_49_21.csv');
-behav_data_table = readtable('data/Behavior_Data_8_18_2024_5_18_26.csv');
-freesurfer_data_table = readtable('data/HCP_freesurfer_ys1j13_10_16_2024_0_33_16.csv');
+load secure_data/path_info;
+gene_data_table = readtable(gene_data_path);
+behav_data_table = readtable(behav_data_path);
+freesurfer_data_table = readtable(freesurfer_data_path);
 for nrow = size(gene_data_table,1):-1:1
     if ~any(sub_ids==gene_data_table(nrow,'Subject').Variables)
         gene_data_table(nrow,:) = [];

@@ -19,8 +19,9 @@ for n_task = 1:length(task_names)
     catch
         label_data = label_cortical_data;
     end
-
-    HCP_preprocessed_path = ['G:\HCP_3T_', current_task];
+    
+    load secure_data/path_info;
+    HCP_preprocessed_path = [HCP_preprocessed_task_path, current_task];
     cd(HCP_preprocessed_path);
     folder_preproc_list = dir('*_preproc');
     folder_preproc_list = folder_preproc_list([folder_preproc_list.isdir]);
