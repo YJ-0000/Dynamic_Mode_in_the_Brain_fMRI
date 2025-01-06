@@ -96,8 +96,8 @@ angle_D = angle(D(1:2:end,:));
 BB = B(1:2:end,:);
 for ii = 1:size(abs_D,1)
 %     dd = abs_D(ii,:)';
-    dd = angle_D(ii,:)';
-%     dd = BB(ii,:)';
+%     dd = angle_D(ii,:)';
+    dd = BB(ii,:)';
     new_dd = dd - X * pinv(X) * dd;
     Y = [new_dd,Y];
 end
@@ -112,8 +112,8 @@ ACEfit_Par.InfMx     = [current_path,'/data/zygosity.csv'];
 % ACEfit_Par.ResDir    = './ACE_model_results_mag'; 
 % cd(current_path); mkdir('ACE_model_results_angle');
 % ACEfit_Par.ResDir    = './ACE_model_results_angle'; 
-cd(current_path); mkdir('ACE_model_results_B');
-ACEfit_Par.ResDir    = './ACE_model_results_B'; 
+cd(current_path); mkdir('ACE_model_results_temp');
+ACEfit_Par.ResDir    = './ACE_model_results_temp'; 
 ACEfit_Par.Subset    = [];
 ACEfit_Par.Pmask     = '';                % Brain mask image (default: 
                                           % whole volume)
@@ -255,18 +255,21 @@ father_counts = histcounts(father_idx, 1:max(father_idx)+1);
 sameFather = father_counts(father_idx) > 1;
 
 % Subjects with at least one shared parent
-hasSiblingOrTwin = sameMother | sameFather;
+% filter_idx = sameMother | sameFather;
+
+% no filtering
+filter_idx = true(size(sameMother));
 
 % Display number of subjects before filtering
 fprintf('Number of subjects before filtering: %d\n', num_subjects_D);
 
 % Filter D and subjectsTable
 % abs_D_filtered = abs_D(:, hasSiblingOrTwin);
-abs_D_filtered = Y(hasSiblingOrTwin,:)';
-new_table_filtered = new_table(hasSiblingOrTwin, :);
+Y_filtered = Y(filter_idx,:)';
+new_table_filtered = new_table(filter_idx, :);
 
 % Display number of subjects after filtering
-[num_items_filtered, num_subjects_filtered] = size(abs_D_filtered);
+[num_items_filtered, num_subjects_filtered] = size(Y_filtered);
 fprintf('Number of subjects after filtering: %d\n', num_subjects_filtered);
 
 % Update num_subjects_D to reflect the filtered data
@@ -277,11 +280,11 @@ num_subjects_D = num_subjects_filtered;
 % -------------------------------------------------------------------------
 
 % Transpose D to have subjects as rows
-D_transposed = abs_D_filtered'; % [num_subjects x num_items]
+Y_transposed = Y_filtered'; % [num_subjects x num_items]
 
 % Compute pairwise cosine distances using pdist
 % 'cosine' distance in pdist is defined as 1 - cosine similarity
-cosine_distances = pdist(D_transposed, 'cosine'); % [nchoosek(num_subjects,2) x 1]
+cosine_distances = pdist(Y_transposed, 'cosine'); % [nchoosek(num_subjects,2) x 1]
 
 % -------------------------------------------------------------------------
 % Step 3: Generate All Unique Subject Pairs
@@ -353,6 +356,28 @@ h = daviolinplot(distanceTable.CosineDistance,'groups',group_inx,'color',c,'xtla
 % ylabel('Cosine Distance');
 % title('Cosine Distance Distribution by Group');
 set(gca, 'FontName', 'Times New Roman', 'FontSize', 24);
+
+
+[~,p_MZ_DZ,~,stat_MZ_DZ] = ttest2(distanceTable.CosineDistance(strcmp(distanceTable.Group, 'MZ')), ...
+                                  distanceTable.CosineDistance(strcmp(distanceTable.Group, 'DZ')));
+cohen_d_MZ_DZ = mean(distanceTable.CosineDistance(strcmp(distanceTable.Group, 'MZ')) - mean(distanceTable.CosineDistance(strcmp(distanceTable.Group, 'DZ')))) / stat_MZ_DZ.sd;
+
+fprintf('MZ vs. DZ: t=%.6f, Cohen''s d=%.6f, p=%.8f \n', stat_MZ_DZ.tstat,cohen_d_MZ_DZ,p_MZ_DZ/2);
+
+[~,p_DZ_Sib,~,stat_DZ_Sib] = ttest2(distanceTable.CosineDistance(strcmp(distanceTable.Group, 'DZ')), ...
+                                  distanceTable.CosineDistance(strcmp(distanceTable.Group, 'Sibling')));
+cohen_d_DZ_Sib = mean(distanceTable.CosineDistance(strcmp(distanceTable.Group, 'DZ')) - mean(distanceTable.CosineDistance(strcmp(distanceTable.Group, 'Sibling')))) / stat_DZ_Sib.sd;
+fprintf('DZ vs. Sibling: t=%.6f, Cohen''s d=%.6f, p=%.8f \n', stat_DZ_Sib.tstat,cohen_d_DZ_Sib,p_DZ_Sib/2);
+
+[~,p_DZ_Unr,~,stat_DZ_Unr] = ttest2(distanceTable.CosineDistance(strcmp(distanceTable.Group, 'DZ')), ...
+                                  distanceTable.CosineDistance(strcmp(distanceTable.Group, 'Unrelated')));
+cohen_d_DZ_Unr = mean(distanceTable.CosineDistance(strcmp(distanceTable.Group, 'DZ')) - mean(distanceTable.CosineDistance(strcmp(distanceTable.Group, 'Unrelated')))) / stat_DZ_Unr.sd;
+fprintf('DZ vs. Unrelated: t=%.6f, Cohen''s d=%.6f, p=%.8f \n', stat_DZ_Unr.tstat,cohen_d_DZ_Unr,p_DZ_Unr/2);
+
+[~,p_Sib_Unr,~,stat_Sib_Unr] = ttest2(distanceTable.CosineDistance(strcmp(distanceTable.Group, 'Sibling')), ...
+                                  distanceTable.CosineDistance(strcmp(distanceTable.Group, 'Unrelated')));
+cohen_d_Sib_Unr = mean(distanceTable.CosineDistance(strcmp(distanceTable.Group, 'Sibling')) - mean(distanceTable.CosineDistance(strcmp(distanceTable.Group, 'Unrelated')))) / stat_Sib_Unr.sd;
+fprintf('Sibling vs. Unrelated: t=%.6f, Cohen''s d=%.6f, p=%.8f \n', stat_Sib_Unr.tstat,cohen_d_Sib_Unr,p_Sib_Unr/2);
 
 
 

@@ -57,8 +57,10 @@ disp(' ');
 for n_task = 1:num_tasks
     phase_task_1 = phase_tasks{n_task};
     for n_dm = 1:5
-        [h,p] = ttest(phase_task_1(n_dm,:));
-        fprintf('Significance of DM%d during %s: mean theta = %.6f , p=%.6f \n',n_dm,task_names{n_task}, mean(phase_task_1(n_dm,:)), p);
+        [h,p,~,stat] = ttest(phase_task_1(n_dm,:));
+        cohen_d = mean(phase_task_1(n_dm,:)) / stat.sd;
+        fprintf('Significance of DM%d during %s: cohen''s d=%.6f , t=%.6f,  p=%.6f \n', ...
+            n_dm,task_names{n_task}, cohen_d, stat.tstat, p);
     end
     disp(' ');
 end

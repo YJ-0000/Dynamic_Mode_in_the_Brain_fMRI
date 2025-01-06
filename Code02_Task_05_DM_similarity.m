@@ -271,6 +271,7 @@ for i = 1:num_tasks
 end
 cosine_sim_mag_tasks_accum = cosine_sim_mag_tasks(:, tril(ones(num_tasks,'logical'),-1));
 [~,p_mag, ci_mag, stats_mag] = ttest2(cosine_sim_mag_subjects_accum, cosine_sim_mag_tasks_accum(:));
+cohen_d_mag = (mean(cosine_sim_mag_subjects_accum) - mean(cosine_sim_mag_tasks_accum(:)))/stats_mag.sd;
 
 cosine_sim_phase_subjects_accum = [];
 for i = 1:num_tasks
@@ -279,6 +280,7 @@ for i = 1:num_tasks
 end
 cosine_sim_phase_tasks_accum = cosine_sim_phase_tasks(:, tril(ones(num_tasks,'logical'),-1));
 [~,p_phase, ci_phase, stats_phase] = ttest2(cosine_sim_phase_subjects_accum, cosine_sim_phase_tasks_accum(:));
+cohen_d_phase = (mean(cosine_sim_phase_subjects_accum) - mean(cosine_sim_phase_tasks_accum(:)))/stats_phase.sd;
 
 % New Statistical Tests for Intensity (B_tasks)
 cosine_sim_B_subjects_accum = [];
@@ -288,6 +290,7 @@ for i = 1:num_tasks
 end
 cosine_sim_B_tasks_accum = cosine_sim_B_tasks(:, tril(ones(num_tasks,'logical'),-1));
 [~,p_B, ci_B, stats_B] = ttest2(cosine_sim_B_subjects_accum, cosine_sim_B_tasks_accum(:));
+cohen_d_B = (mean(cosine_sim_B_subjects_accum) - mean(cosine_sim_B_tasks_accum(:)))/stats_B.sd;
 
 %% Compare Similarities
 % Average similarity between different subjects in the same task
@@ -309,6 +312,8 @@ fprintf('Mean across all tasks: %f\n', mean_B_similarity_diff_subjects);
 
 fprintf('\nAverage Cosine Similarity between Mode-Engagement Level of Different Tasks for Same Subject:\n');
 fprintf('Mean across all task pairs: %f\n', mean_B_similarity_diff_tasks);
+fprintf('cohen''s d : %f\n', cohen_d_B);
+fprintf('t-value: %f\n', stats_B.tstat);
 fprintf('p-value: %f\n', p_B);
 
 fprintf('\nAverage Cosine Similarity between Persistence rate of Different Subjects in Same Task:\n');
@@ -316,6 +321,8 @@ fprintf('Mean across all tasks: %f\n', mean_mag_similarity_diff_subjects);
 
 fprintf('\nAverage Cosine Similarity between Persistence rate of Different Tasks for Same Subject:\n');
 fprintf('Mean across all task pairs: %f\n', mean_mag_similarity_diff_tasks);
+fprintf('cohen''s d : %f\n', cohen_d_mag);
+fprintf('t-value: %f\n', stats_mag.tstat);
 fprintf('p-value: %f\n', p_mag);
 
 fprintf('\nAverage Cosine Similarity between Progression rate of Different Subjects in Same Task:\n');
@@ -323,5 +330,7 @@ fprintf('Mean across all tasks: %f\n', mean_phase_similarity_diff_subjects);
 
 fprintf('\nAverage Cosine Similarity between Progression rate of Different Tasks for Same Subject:\n');
 fprintf('Mean across all task pairs: %f\n', mean_phase_similarity_diff_tasks);
+fprintf('cohen''s d : %f\n', cohen_d_phase);
+fprintf('t-value: %f\n', stats_phase.tstat);
 fprintf('p-value: %f\n', p_phase);
 
