@@ -35,7 +35,7 @@ group_corr_mat(sort_idx(length(sort_idx)*0.2:end)) = 0;
 
 [coeff, score, latent, tsquared, explained, mu] = pca(group_corr_mat,'NumComponents',5);
 
-RSFC_grad = coeff;
+RSFC_grad = score;
 save results/RSFC_standard_grad RSFC_grad group_corr_mat group_corr_mat_original
 
 %% Resting-state FC gradient (including subcortex)
@@ -71,7 +71,7 @@ group_corr_mat(sort_idx(length(sort_idx)*0.2:end)) = 0;
 
 [coeff, score, latent, tsquared, explained, mu] = pca(group_corr_mat,'NumComponents',5);
 
-RSFC_grad = coeff;
+RSFC_grad = score;
 save results/RSFC_standard_grad_all RSFC_grad group_corr_mat group_corr_mat_original
 
 %% Global signal removed
