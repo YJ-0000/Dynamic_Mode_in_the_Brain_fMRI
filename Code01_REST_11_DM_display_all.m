@@ -95,7 +95,7 @@ cmap = flipud(cmap);
 % cmap = slanCM(1, 256);
 % Scales
 %%
-for pair_num = 2:12
+for pair_num = 1:12
     
     if pair_num == 1
         ref_t = 27;
