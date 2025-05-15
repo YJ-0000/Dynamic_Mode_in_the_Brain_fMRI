@@ -122,8 +122,8 @@ catch
     label_idx_list = 1:N;
 end
 
-mkdir('DM_video_HCP_REST_unfiltered_fbDMD');
-save_dir = [pwd filesep 'DM_video_HCP_REST_unfiltered_fbDMD'];
+mkdir('DM_video_HCP_REST_fbDMD');
+save_dir = [pwd filesep 'DM_video_HCP_REST_fbDMD'];
 
 frame_dt = 0.5;
 
