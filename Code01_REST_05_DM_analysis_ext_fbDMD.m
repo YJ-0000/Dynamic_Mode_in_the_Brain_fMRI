@@ -65,12 +65,20 @@ disp('*** total number of time points ***');
 disp([i_num*(length(t_fine)-1), size(X,2)]);
 
 % removing rois with no signal
-var_X = var(X,0,2);
+try
+    var_X = var(X,0,2);
+catch
+    var_X = zeros(size(X,1),1);
+    for nroi = 1:size(X,1)
+        var_X(nroi) = var(X(nroi,:));
+    end
+end
+
+clear time_series_denoised_filtered
+
 roi_exclude = var_X < 0.001;
 X(roi_exclude,:) = [];
 Y(roi_exclude,:) = [];
-
-clear time_series_denoised_filtered
 
 %%
 %%% fbDMD
