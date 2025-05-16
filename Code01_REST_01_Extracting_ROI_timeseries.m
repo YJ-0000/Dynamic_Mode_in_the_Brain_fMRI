@@ -116,3 +116,53 @@ end
 cd(current_path);
 save results/HCP_timeseries_cortical_subcortical_extracted_meta sub_ids folder_denoised_list N len_time label_idx_list
 save('results/HCP_timeseries_cortical_subcortical_extracted.mat', 'time_series_denoised', '-v7.3')
+
+%% Identifying problematic subjects
+cd(current_path);
+load secure_data/path_info;
+behav_data_table = readtable(behav_data_path,'VariableNamingRule','preserve');
+for nrow = size(behav_data_table,1):-1:1
+    if ~any(sub_ids==behav_data_table(nrow,'Subject').Variables)
+        behav_data_table(nrow,:) = [];
+    end
+end
+behav_data_table = sortrows(behav_data_table, 'Subject');
+
+does_have_MMSE = ~strcmp(behav_data_table.MMSE_Compl,'true');
+MMSE_thres = 26;
+is_cognitive_impaired = behav_data_table.MMSE_Score <= MMSE_thres;
+
+HCP_preproc_dir = dir(fullfile(HCP_preprocessed_rest_path,'*rfMRI*'));
+
+sub_ids_foler = zeros(size(HCP_preproc_dir));
+movement_thres = 0.15;
+is_excluded_due_movement = false(length(sub_ids),2);
+for n_fol = 1:length(HCP_preproc_dir)
+    fol_prerpoc_name = HCP_preproc_dir(n_fol).name;
+    aa = split(fol_prerpoc_name,'_');
+    sub_idx = find(sub_ids == str2double(aa{1}));
+    
+    if isempty(sub_idx)
+        continue;
+    end
+    
+    fprintf('Checking %s whether mean relative movement exceeds %0.4f mm \n',aa{1},movement_thres)
+    
+    REST_1_or_2 = aa{4};
+    rest_idx = str2double(REST_1_or_2(end));
+    try
+        movement_rel_RMS_LR_path = fullfile(HCP_preprocessed_rest_path,HCP_preproc_dir(n_fol).name,aa{1},...
+            'MNINonLinear','Results',['rfMRI_',REST_1_or_2,'_LR'],'Movement_RelativeRMS_mean.txt');
+        movement_rel_RMS_LR = readmatrix(movement_rel_RMS_LR_path);
+        movement_rel_RMS_RL_path = fullfile(HCP_preprocessed_rest_path,HCP_preproc_dir(n_fol).name,aa{1},...
+            'MNINonLinear','Results',['rfMRI_',REST_1_or_2,'_RL'],'Movement_RelativeRMS_mean.txt');
+        movement_rel_RMS_RL = readmatrix(movement_rel_RMS_RL_path);
+        is_excluded_due_movement(sub_idx,rest_idx) = ...
+            any(movement_rel_RMS_LR > movement_thres) || any(movement_rel_RMS_RL > movement_thres);
+    catch
+        is_excluded_due_movement(sub_idx,rest_idx) = true;
+    end
+end
+
+%%
+save results/HCP_timeseries_subject_exclude_info sub_ids is_excluded_due_movement does_have_MMSE is_cognitive_impaired MMSE_thres movement_thres
