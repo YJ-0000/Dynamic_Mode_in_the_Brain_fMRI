@@ -3,10 +3,34 @@ current_path = pwd;
 conn;
 close all;
 %%
+load('results/HCP_timeseries_subject_exclude_info.mat');
 load('results/HCP_timeseries_cortical_subcortical_extracted_filtered_meta.mat');
 load('results/HCP_timeseries_cortical_subcortical_extracted_filtered.mat');
 %%
+is_sub_exclude = true;
+if is_sub_exclude
+    for nsub = 1:length(sub_ids)
+        if does_have_MMSE(nsub) || is_cognitive_impaired(nsub)
+            time_series_denoised_filtered(nsub,:) = {[],[],[],[]}; %#ok<SAGROW>
+        else
+            if is_excluded_due_movement(nsub,1)
+                time_series_denoised_filtered(nsub,1:2) = {[],[]}; %#ok<SAGROW>
+            end
+            if is_excluded_due_movement(nsub,2)
+                time_series_denoised_filtered(nsub,3:4) = {[],[]}; %#ok<SAGROW>
+            end
+        end
+    end
+end
 
+remaining_sub_idx = false(length(sub_ids),1);
+for nsub = 1:length(sub_ids)
+    if ~isempty(time_series_denoised_filtered{nsub,1}) || ~isempty(time_series_denoised_filtered{nsub,2}) || ~isempty(time_series_denoised_filtered{nsub,3}) || ~isempty(time_series_denoised_filtered{nsub,4})
+        remaining_sub_idx(nsub) = true;
+    end
+end
+
+%%
 n_time = 1200;
 i_num = 0;
 for ii = 1:(4*size(time_series_denoised_filtered,1))
@@ -104,7 +128,7 @@ Phi_all = [Phi_sorted,Phi_rest];
     
 
 %%
-save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm Phi_sorted lambda A roi_exclude Phi_all
+save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude Phi_sorted lambda A roi_exclude Phi_all
 
 %%
 
