@@ -164,5 +164,11 @@ for n_fol = 1:length(HCP_preproc_dir)
     end
 end
 
+RL_processing_errors_subs = [103010;113417;116423;120010;121719;127226;130114;143830;169040;185038;189652;202820;204218;329844;385046;401422;462139;469961;644246;688569;723141;908860;943862;969476;971160];
+is_RL_processing_errors = false(length(sub_ids),1);
+for n_rl = 1:length(RL_processing_errors_subs)
+    is_RL_processing_errors(sub_ids==RL_processing_errors_subs(n_rl)) = true;
+end
+
 %%
-save results/HCP_timeseries_subject_exclude_info sub_ids is_excluded_due_movement does_have_MMSE is_cognitive_impaired MMSE_thres movement_thres
+save results/HCP_timeseries_subject_exclude_info sub_ids is_excluded_due_movement does_have_MMSE is_cognitive_impaired MMSE_thres movement_thres is_RL_processing_errors
