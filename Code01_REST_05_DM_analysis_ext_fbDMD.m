@@ -10,7 +10,7 @@ load('results/HCP_timeseries_cortical_subcortical_extracted_filtered.mat');
 is_sub_exclude = true;
 if is_sub_exclude
     for nsub = 1:length(sub_ids)
-        if does_have_MMSE(nsub) || is_cognitive_impaired(nsub)
+        if does_have_MMSE(nsub) || is_cognitive_impaired(nsub) || is_RL_processing_errors(nsub)
             time_series_denoised_filtered(nsub,:) = {[],[],[],[]}; %#ok<SAGROW>
         else
             if is_excluded_due_movement(nsub,1)
@@ -29,6 +29,33 @@ for nsub = 1:length(sub_ids)
         remaining_sub_idx(nsub) = true;
     end
 end
+
+load secure_data/path_info;
+gene_data_table = readtable(gene_data_path,'VariableNamingRule','preserve');
+behav_data_table = readtable(behav_data_path,'VariableNamingRule','preserve');
+freesurfer_data_table = readtable(freesurfer_data_path);
+for nrow = size(gene_data_table,1):-1:1
+    if ~any(sub_ids==gene_data_table(nrow,'Subject').Variables)
+        gene_data_table(nrow,:) = [];
+    end
+end
+for nrow = size(behav_data_table,1):-1:1
+    if ~any(sub_ids==behav_data_table(nrow,'Subject').Variables)
+        behav_data_table(nrow,:) = [];
+    end
+end
+gene_data_table = sortrows(gene_data_table, 'Subject');
+behav_data_table = sortrows(behav_data_table, 'Subject');
+
+ages = gene_data_table.Age_in_Yrs;
+genders = behav_data_table.Gender;
+
+num_female = sum(strcmp(genders(remaining_sub_idx),'F'));
+mean_age = mean(ages(remaining_sub_idx));
+std_age = std(ages(remaining_sub_idx));
+
+fprintf('Total number of subjects: %d, Female=%d, mean age=%0.2f, std=%0.2f \n', ...
+    sum(remaining_sub_idx),num_female,mean_age,std_age);
 
 %%
 n_time = 1200;
