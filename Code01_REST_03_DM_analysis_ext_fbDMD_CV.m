@@ -2,8 +2,60 @@ clear; clc;
 current_path = pwd;
 % conn;
 close all;
+load('results/HCP_timeseries_subject_exclude_info.mat');
 load('results/HCP_timeseries_cortical_subcortical_extracted_filtered_meta.mat');
 load('results/HCP_timeseries_cortical_subcortical_extracted_filtered.mat');
+
+%%
+is_sub_exclude = true;
+if is_sub_exclude
+    for nsub = 1:length(sub_ids)
+        if does_have_MMSE(nsub) || is_cognitive_impaired(nsub) || is_RL_processing_errors(nsub)
+            time_series_denoised_filtered(nsub,:) = {[],[],[],[]}; %#ok<SAGROW>
+        else
+            if is_excluded_due_movement(nsub,1)
+                time_series_denoised_filtered(nsub,1:2) = {[],[]}; %#ok<SAGROW>
+            end
+            if is_excluded_due_movement(nsub,2)
+                time_series_denoised_filtered(nsub,3:4) = {[],[]}; %#ok<SAGROW>
+            end
+        end
+    end
+end
+
+remaining_sub_idx = false(length(sub_ids),1);
+for nsub = 1:length(sub_ids)
+    if ~isempty(time_series_denoised_filtered{nsub,1}) || ~isempty(time_series_denoised_filtered{nsub,2}) || ~isempty(time_series_denoised_filtered{nsub,3}) || ~isempty(time_series_denoised_filtered{nsub,4})
+        remaining_sub_idx(nsub) = true;
+    end
+end
+
+load secure_data/path_info;
+gene_data_table = readtable(gene_data_path,'VariableNamingRule','preserve');
+behav_data_table = readtable(behav_data_path,'VariableNamingRule','preserve');
+freesurfer_data_table = readtable(freesurfer_data_path);
+for nrow = size(gene_data_table,1):-1:1
+    if ~any(sub_ids==gene_data_table(nrow,'Subject').Variables)
+        gene_data_table(nrow,:) = [];
+    end
+end
+for nrow = size(behav_data_table,1):-1:1
+    if ~any(sub_ids==behav_data_table(nrow,'Subject').Variables)
+        behav_data_table(nrow,:) = [];
+    end
+end
+gene_data_table = sortrows(gene_data_table, 'Subject');
+behav_data_table = sortrows(behav_data_table, 'Subject');
+
+ages = gene_data_table.Age_in_Yrs;
+genders = behav_data_table.Gender;
+
+num_female = sum(strcmp(genders(remaining_sub_idx),'F'));
+mean_age = mean(ages(remaining_sub_idx));
+std_age = std(ages(remaining_sub_idx));
+
+fprintf('Total number of subjects: %d, Female=%d, mean age=%0.2f, std=%0.2f \n', ...
+    sum(remaining_sub_idx),num_female,mean_age,std_age);
 %%
 
 n_time = 1200;
@@ -79,12 +131,14 @@ clear time_series_denoised_filtered
 %% Cross-validation parametters
 disp('*** CV initialize ***');
 cv_num = 5;
-rng(123);
-sub_id_perm = randperm(num_sub);
+rng(111);
+num_sub_remaining = length(find(remaining_sub_idx));
+sub_id_perm = find(remaining_sub_idx);
+sub_id_perm = sub_id_perm(randperm(num_sub_remaining));
 train_id_list = cell(cv_num,1);
 test_id_list = cell(cv_num,1);
 % Calculate the number of subjects per fold
-fold_size = floor(num_sub / cv_num);
+fold_size = floor(num_sub_remaining / cv_num);
 
 % Loop through each fold to assign training and testing IDs
 for n_cv = 1:cv_num
@@ -95,7 +149,7 @@ for n_cv = 1:cv_num
         end_idx = n_cv * fold_size;
     else
         % Ensure the last fold includes any remaining subjects
-        end_idx = num_sub;
+        end_idx = num_sub_remaining;
     end
     
     % Extract the test IDs for the current fold
@@ -161,7 +215,7 @@ for n_cv = 1:cv_num
 end
 
 %% save CV results
-save DMs/DM_cortical_subcortical_noROInorm_CV Phi_fold lambda_fold roi_exclude
+save DMs/DM_cortical_subcortical_noROInorm_subExclude_CV Phi_fold lambda_fold roi_exclude
 
 %% Testing DM consistency
 max_DMs = 24;
@@ -245,6 +299,10 @@ loss_fold = zeros(cv_num,max_DMs/2);
 R_squared_zero_fold = zeros(cv_num,max_DMs/2);
 R_squared_null_fold = zeros(cv_num,max_DMs/2);
 R_squared_fold = zeros(cv_num,max_DMs/2);
+R_squered_zero_all = cell(1,cv_num);
+R_squered_null_all = cell(1,cv_num);
+R_squered_DM_all = cell(1,cv_num);
+
 for n_cv = 1:cv_num
     disp(['=== CV prediction fold #',num2str(n_cv),'===']);
     lambda = lambda_fold{n_cv};
@@ -253,6 +311,8 @@ for n_cv = 1:cv_num
     
     current_train_subjects = train_id_list{n_cv};
     current_test_subjects = test_id_list{n_cv};
+    
+    R_squered_DM_test_all = zeros(length(current_test_subjects),max_DMs/2);
     
     for num_DMs = 2:2:max_DMs
         tic
@@ -361,6 +421,13 @@ for n_cv = 1:cv_num
         R_squared_fold_zero_current(isnan(R_squared_fold_zero_current)) = 0;
         R_squared_fold_null_current(isnan(R_squared_fold_null_current)) = 0;
         R_squared_fold_current(isnan(R_squared_fold_current)) = 0;
+        
+        if num_DMs/2 == 1
+            R_squered_zero_test_all = R_squared_fold_zero_current;
+            R_squered_null_test_all = R_squared_fold_null_current;
+        end
+        R_squered_DM_test_all(:,num_DMs/2) = R_squared_fold_current;
+        
         loss_fold(n_cv,num_DMs/2) = sum(loss_fold_current.*session_count)/sum(session_count);
         R_squared_zero_fold(n_cv,num_DMs/2) = sum(R_squared_fold_zero_current.*session_count)/sum(session_count);
         R_squared_null_fold(n_cv,num_DMs/2) = sum(R_squared_fold_null_current.*session_count)/sum(session_count);
@@ -371,6 +438,11 @@ for n_cv = 1:cv_num
             ', Loss ratio compared to null model: ',num2str(loss_fold(n_cv,num_DMs/2),'%.6f')])
         toc
     end
+    
+    R_squered_zero_all{n_cv} = R_squered_zero_test_all;
+    R_squered_null_all{n_cv} = R_squered_null_test_all;
+    R_squered_DM_all{n_cv} = R_squered_DM_test_all;
+    
     disp('===== Fold Done ====');
 end
 
@@ -378,7 +450,7 @@ figure;
 subplot(2,1,1); bar(mean(R_squared_fold)-min(mean(R_squared_fold)));
 subplot(2,1,2); bar(mean(loss_fold)-min(mean(loss_fold)));
 
-save DMs/DM_cortical_subcortical_noROInorm_CV_prediction Phi_fold lambda_fold roi_exclude loss_fold R_squared_fold R_squared_zero_fold R_squared_null_fold
+save DMs/DM_cortical_subcortical_noROInorm_subExclude_CV_prediction Phi_fold lambda_fold roi_exclude loss_fold R_squared_fold R_squared_zero_fold R_squared_null_fold R_squered_zero_all R_squered_null_all R_squered_DM_all
 
 %% LASSO (training-test)
 lambda_list =linspace(10,100,19);
@@ -411,10 +483,12 @@ for nsub = 1:length(tau)
     R2_list_allsub_lambda(nsub,:) = mean(R2_list_ses_lambda);
 end
 
-save results/LASSO_training_temp R2_list_allsub_lambda lambda_list
+save results/LASSO_subExclude_training_temp R2_list_allsub_lambda lambda_list
+
 
 %%% test %%%
 R_squared_fold_LASSO = zeros(cv_num,1);
+R_squared_fold_LASSO_all = cell(1,cv_num);
 for n_cv = 1:cv_num
     disp(['=== CV prediction fold #',num2str(n_cv),'===']);
     lambda = lambda_fold{n_cv};
@@ -467,11 +541,12 @@ for n_cv = 1:cv_num
         disp('');
     end
     R_squared_fold_current(isnan(R_squared_fold_current)) = 0;
+    R_squared_fold_LASSO_all{n_cv} = R_squared_fold_current;
     R_squared_fold_LASSO(n_cv) = sum(R_squared_fold_current.*session_count)/sum(session_count);
-    disp(['R_squared (current fold): ',num2str(R_squared_fold_LASSO(n_cv),'%.6f'),'\n\n'])
+    fprintf('R_squared (current fold): %.6f\n\n',R_squared_fold_LASSO(n_cv))
 end
 
-save('results/other_model_cv_results', 'R_squared_fold_LASSO', '-append');
+save('results/other_model_cv_results_subExclude', 'R_squared_fold_LASSO','R_squared_fold_LASSO_all');
 
 %% Hyperparameter Plot for All CV Folds in a Single Figure
 
@@ -582,7 +657,7 @@ end
 title(t, 'R² vs \lambda Across All CV Folds', 'FontSize', 16, 'FontWeight', 'bold');
 
 % Optionally, display all optimal lambdas after the plots
-fprintf('\nOptimal \lambda values across all CV folds:\n');
+fprintf('\nOptimal lambda values across all CV folds:\n');
 disp(optimal_lambdas);
 
 
@@ -624,10 +699,11 @@ for nsub = 1:length(tau)
     R2_list_allsub_h(nsub,:) = mean(R2_list_ses_h);
 end
 
-save results/manifold_training_temp R2_list_allsub_h h_list
+save results/manifold_subExclude_training_temp R2_list_allsub_h h_list
 
 %%% test %%%
 R_squared_fold_manifold = zeros(cv_num,1);
+R_squared_fold_manifold_all = cell(1,cv_num);
 for n_cv = 1:cv_num
     disp(['=== CV prediction fold #',num2str(n_cv),'===']);
     lambda = lambda_fold{n_cv};
@@ -680,11 +756,12 @@ for n_cv = 1:cv_num
         disp('');
     end
     R_squared_fold_current(isnan(R_squared_fold_current)) = 0;
+    R_squared_fold_manifold_all{n_cv} = R_squared_fold_current;
     R_squared_fold_manifold(n_cv) = sum(R_squared_fold_current.*session_count)/sum(session_count);
     disp(['R_squared (current fold): ',num2str(R_squared_fold_manifold(n_cv),'%.6f'),'\n\n'])
 end
 
-save('results/other_model_cv_results', 'R_squared_fold_manifold', '-append');
+save('results/other_model_cv_results_subExclude', 'R_squared_fold_manifold','R_squared_fold_manifold_all', '-append');
 
 %% Hyperparameter Plot for All CV Folds in a Single Figure (Using Hyperparameter h)
 
@@ -797,3 +874,67 @@ title(t, 'R² vs h Across All CV Folds', 'FontSize', 16, 'FontWeight', 'bold');
 fprintf('\nOptimal h values across all CV folds:\n');
 disp(optimal_h);
 
+%% Statistical test for CV accuracies
+R2_DM_concat    = [];
+R2_null_concat = [];
+R2_LASSO_concat   = [];
+R2_manifold_concat = [];
+for k = 1:numel(R_squered_DM_all)
+    r2dm      = R_squered_DM_all{k};          % [n_sub × n_modes]
+    r2n       = R_squered_null_all{k}';       % [n_sub × 1]
+    r2lasso   = R_squared_fold_LASSO_all{k}'; % [n_sub × 1]
+    r2manifold= R_squared_fold_manifold_all{k}';
+    
+    R2_DM_concat      = [R2_DM_concat;      r2dm];
+    R2_null_concat    = [R2_null_concat;    repmat(r2n,1,size(r2dm,2))];
+    R2_LASSO_concat   = [R2_LASSO_concat;   repmat(r2lasso,1,size(r2dm,2))];
+    R2_manifold_concat= [R2_manifold_concat;repmat(r2manifold,1,size(r2dm,2))];
+end
+[~, n_modes] = size(R2_DM_concat);
+
+P_DM = nan(n_modes);
+for i = 1:n_modes
+    for j = 1:n_modes
+        if i < j
+            [p, ~] = signrank(R2_DM_concat(:,i), R2_DM_concat(:,j));
+            P_DM(i,j) = p;
+        end
+    end
+end
+
+methods = {'Null','LASSO','Manifold'};
+R2_methods = { R2_null_concat(:,1), R2_LASSO_concat(:,1), R2_manifold_concat(:,1) };
+n_met = numel(methods);
+
+P_met = nan(n_modes,n_met);
+for i = 1:n_modes
+    for j = 1:n_met
+        [p, ~] = signrank(R2_DM_concat(:,i), R2_methods{j});
+        P_met(i,j) = p;
+    end
+end
+
+figure('Position',[100 100 1100 600]);
+
+% 3-1) DM modes heatmap
+h1 = heatmap(1:(n_modes+n_met), 1:n_modes, [P_DM,P_met], ...
+    'ColorLimits',[0 0.05], ...          % p < 0.05
+    'ColorbarVisible','on');
+h1.FontSize = 15;
+h1.FontName = 'Times New Roman';
+% h1.XLabel = 'Number of DMs / other models';
+h1.YLabel = 'Number of DMs';
+
+% x-axis: 1,2,…,12,null,linear (LASSO),non-linear (manifold)
+xLabels = [arrayfun(@num2str, 1:n_modes, 'UniformOutput', false), ...
+           {'null', 'Linear (LASSO)', 'Nonlinear (manifold)'}];
+h1.XDisplayLabels = xLabels;
+
+% y-axis: 1,2,…,12
+yLabels = arrayfun(@num2str, 1:n_modes, 'UniformOutput', false);
+h1.YDisplayLabels = yLabels;
+
+ax = gca;
+    
+axp = struct(ax);       %you will get a warning
+axp.Axes.XAxisLocation = 'top';
