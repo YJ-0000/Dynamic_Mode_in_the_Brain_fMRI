@@ -1,7 +1,61 @@
 clear; clc;
 current_path = pwd;
+load('results/HCP_timeseries_subject_exclude_info.mat');
 load('results/HCP_timeseries_cortical_subcortical_extracted_filtered_meta.mat');
 load('results/HCP_timeseries_cortical_subcortical_extracted_filtered.mat');
+
+%%
+is_sub_exclude = true;
+if is_sub_exclude
+    for nsub = 1:length(sub_ids)
+        if does_have_MMSE(nsub) || is_cognitive_impaired(nsub) || is_RL_processing_errors(nsub)
+            time_series_denoised_filtered(nsub,:) = {[],[],[],[]}; %#ok<SAGROW>
+        else
+            if is_excluded_due_movement(nsub,1)
+                time_series_denoised_filtered(nsub,1:2) = {[],[]}; %#ok<SAGROW>
+            end
+            if is_excluded_due_movement(nsub,2)
+                time_series_denoised_filtered(nsub,3:4) = {[],[]}; %#ok<SAGROW>
+            end
+        end
+    end
+end
+
+remaining_sub_idx = false(length(sub_ids),1);
+for nsub = 1:length(sub_ids)
+    if ~isempty(time_series_denoised_filtered{nsub,1}) || ~isempty(time_series_denoised_filtered{nsub,2}) || ~isempty(time_series_denoised_filtered{nsub,3}) || ~isempty(time_series_denoised_filtered{nsub,4})
+        remaining_sub_idx(nsub) = true;
+    end
+end
+
+load secure_data/path_info;
+gene_data_table = readtable(gene_data_path,'VariableNamingRule','preserve');
+behav_data_table = readtable(behav_data_path,'VariableNamingRule','preserve');
+freesurfer_data_table = readtable(freesurfer_data_path);
+for nrow = size(gene_data_table,1):-1:1
+    if ~any(sub_ids==gene_data_table(nrow,'Subject').Variables)
+        gene_data_table(nrow,:) = [];
+    end
+end
+for nrow = size(behav_data_table,1):-1:1
+    if ~any(sub_ids==behav_data_table(nrow,'Subject').Variables)
+        behav_data_table(nrow,:) = [];
+    end
+end
+gene_data_table = sortrows(gene_data_table, 'Subject');
+behav_data_table = sortrows(behav_data_table, 'Subject');
+
+ages = gene_data_table.Age_in_Yrs;
+genders = behav_data_table.Gender;
+
+num_female = sum(strcmp(genders(remaining_sub_idx),'F'));
+mean_age = mean(ages(remaining_sub_idx));
+std_age = std(ages(remaining_sub_idx));
+
+fprintf('Total number of subjects: %d, Female=%d, mean age=%0.2f, std=%0.2f \n', ...
+    sum(remaining_sub_idx),num_female,mean_age,std_age);
+
+
 %% Resting-state FC gradient
 N=360;
 
@@ -75,6 +129,7 @@ RSFC_grad = score;
 save results/RSFC_standard_grad_all RSFC_grad group_corr_mat group_corr_mat_original
 
 %% Global signal removed
+N = 360;
 corr_mats_global_removed = zeros(4*size(time_series_denoised_filtered,1),N,N);
 i_num = 0;
 for ii = 1:(4*size(time_series_denoised_filtered,1))
@@ -102,11 +157,11 @@ end
 corr_mats_global_removed = atanh(corr_mats_global_removed(1:i_num,:,:));
 group_corr_mat_global_removed = tanh(squeeze(nanmean(corr_mats_global_removed)));
 
-save results/RSFC_all group_corr_mat_original group_corr_mat_global_removed
+save results/RSFC group_corr_mat_original group_corr_mat_global_removed
 
 %% Resting-state FC gradient (subcortex)
-load results/RSFC_all
-load('DMs\DM_cortical_subcortical_ext_fbDMD_noROInorm.mat', 'roi_exclude')
+load results/RSFC_standard_grad_all
+load('DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude.mat', 'roi_exclude')
 
 group_corr_mat_original(roi_exclude,:) = [];
 group_corr_mat_original(:,roi_exclude) = [];
@@ -144,20 +199,27 @@ for n_area = 1:length(subcortical_areas)
     C = group_corr_mat_original(target_roi_idx,:);
     C(:,target_roi_idx) = [];
     
+%     gm = GradientMaps('kernel','na','approach','pca','alignment','','random_state',10,'verbose',true);
+%     
+%     gm = gm.fit(C);
+%
+%     coeff = gm.gradients{1};
+    
     S = corrcoef(C');
 
-    [coeff, ~, latent, tsquared, explained, mu] = pca(S,'NumComponents',5);
+    [coeff, score, latent, tsquared, explained, mu] = pca(S,'NumComponents',5);
     fprintf('%s -- Variance explained by PC1: %.3f, PC2:  %.3f \n',subcortical_areas{n_area},explained(1),explained(2))
     
     if n_area ~= 2
-        coeff = -coeff;
+        score = -score;
     end
     
+
     gradient_cifti_data = zeros(size(labels_subcortical_data));
     for n_roi = 1:length(label_select)
-        gradient_cifti_data(labels_subcortical_data==label_select(n_roi)) = coeff(n_roi,1);
+        gradient_cifti_data(labels_subcortical_data==label_select(n_roi)) = score(n_roi,1);
     end
-    fprintf('Plot info > min: %.5f, max: %.5f \n',min(coeff(:,1)), max(coeff(:,1)));
+    fprintf('Plot info > min: %.5f, max: %.5f \n',min(score(:,1)), max(score(:,1)));
     plot_subcortex(gradient_cifti_data,['results/RSFC_',subcortical_areas{n_area},'_grad.jpg'],[],min(coeff(:,1)),max(coeff(:,1)),subcortical_areas{n_area});
     
     eval(['RSFC_grad_',subcortical_areas{n_area},'=coeff;']);
@@ -168,6 +230,7 @@ end
 save results/RSFC_subcortical_grad RSFC_grad_* subcortical_areas structure_model_idx_list target_roi_idx_*
 
 %% Yeo 7 network partition
+load results/RSFC
 % Parameters
 numClusters = 7;                     % Number of networks to identify
 numROIs = size(group_corr_mat_global_removed, 1); % Number of Regions of Interest (ROIs)
@@ -196,7 +259,7 @@ end
 % load('roi_coordinates.mat', 'roiCoordinates'); 
 
 % Set random seed for reproducibility
-rng(42);
+rng(123);
 
 %%% ------------------ Functional Connectivity Profile Preparation ------------------ %%
 fprintf('Preparing functional connectivity profiles for clustering...\n');
@@ -242,13 +305,13 @@ for k = 1:numClusters
 end
 
 %%% ------------------ Network Assignment and Labeling ------------------ %%
-Yeo_7network_DMN1_vector = clusterCenters(1,:)';
-Yeo_7network_SM_vector = clusterCenters(2,:)';
-Yeo_7network_CEN_vector = clusterCenters(3,:)';
-Yeo_7network_Vis_vector = clusterCenters(4,:)';
-Yeo_7network_DAN_vector = clusterCenters(5,:)';
-Yeo_7network_VAN_vector = clusterCenters(6,:)';
-Yeo_7network_DMN2_vector = clusterCenters(7,:)';
+Yeo_7network_DMN1_vector = clusterCenters(3,:)';
+Yeo_7network_SM_vector = clusterCenters(1,:)';
+Yeo_7network_CEN_vector = clusterCenters(5,:)';
+Yeo_7network_Vis_vector = clusterCenters(2,:)';
+Yeo_7network_DAN_vector = clusterCenters(4,:)';
+Yeo_7network_VAN_vector = clusterCenters(7,:)';
+Yeo_7network_DMN2_vector = clusterCenters(6,:)';
 
 Yeo_7network_all_vector = clusterCenters';
 
@@ -776,7 +839,8 @@ fprintf('Group-level CAP calculation completed successfully.\n');
 % Date: 2024/10/12
 
 % Parameters
-num_subjects = 100; %size(time_series_denoised_filtered, 1); 
+% num_subjects = 100; %size(time_series_denoised_filtered, 1); 
+target_num_subjects = 100;
 num_sessions = size(time_series_denoised_filtered, 2); % 4
 num_rois = 360;
 time_points_per_session = 1200;
@@ -785,13 +849,24 @@ time_points_per_session = 1200;
 % Preallocate for efficiency (assuming all cells are non-empty; adjust if necessary)
 % Count non-empty cells
 num_valid_cells = 0;
-for subj = 1:num_subjects
+num_valid_subjects = 0;
+for subj = 1:size(time_series_denoised_filtered,1)
+    sub_valid_check = false;
     for sess = 1:num_sessions
         if ~isempty(time_series_denoised_filtered{subj, sess})
             num_valid_cells = num_valid_cells + 1;
+            sub_valid_check = true;
         end
     end
+    if sub_valid_check
+        num_valid_subjects = num_valid_subjects + 1;
+    end
+    if num_valid_subjects == target_num_subjects
+        break
+    end
 end
+
+num_subjects = subj;
 
 % Preallocate concatenated data matrix
 % Size: 360 x (1200 * num_valid_cells)
@@ -824,8 +899,8 @@ for subj = 1:num_subjects
                 fmri_data_gsr(roi, :) = normalize((y - y_pred)');
             end
 
-%             group_data(:, current_index:(current_index + time_points_per_session -1)) = fmri_data_gsr;
-            group_data(:, current_index:(current_index + time_points_per_session -1)) = fmri_data;
+            group_data(:, current_index:(current_index + time_points_per_session -1)) = fmri_data_gsr;
+%             group_data(:, current_index:(current_index + time_points_per_session -1)) = fmri_data;
             current_index = current_index + time_points_per_session;
         end
     end
@@ -975,9 +1050,10 @@ grid on;
 
 disp('QPP estimation using the template autoregressive matching algorithm completed successfully.');
 
-save results/QPP_100_noGSR final_qpp_template avg_correlations templates
+save results/QPP_100_GSR final_qpp_template avg_correlations templates
 
 %% display QPP
+N_cortex = 360;
 cd(current_path);
 labels = cifti_read('atlas/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii');
 
