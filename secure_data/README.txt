@@ -1,0 +1,1 @@
+This directory is for saving secure information such as api keys or folder directories.
