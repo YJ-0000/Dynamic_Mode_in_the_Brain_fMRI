@@ -157,6 +157,8 @@ end
 corr_mats_global_removed = atanh(corr_mats_global_removed(1:i_num,:,:));
 group_corr_mat_global_removed = tanh(squeeze(nanmean(corr_mats_global_removed)));
 
+group_corr_mat_original = group_corr_mat_original(1:N,1:N);
+
 save results/RSFC group_corr_mat_original group_corr_mat_global_removed
 
 %% Resting-state FC gradient (subcortex)
@@ -222,7 +224,7 @@ for n_area = 1:length(subcortical_areas)
     fprintf('Plot info > min: %.5f, max: %.5f \n',min(score(:,1)), max(score(:,1)));
     plot_subcortex(gradient_cifti_data,['results/RSFC_',subcortical_areas{n_area},'_grad.jpg'],[],min(coeff(:,1)),max(coeff(:,1)),subcortical_areas{n_area});
     
-    eval(['RSFC_grad_',subcortical_areas{n_area},'=coeff;']);
+    eval(['RSFC_grad_',subcortical_areas{n_area},'=score;']);
     eval(['target_roi_idx_',subcortical_areas{n_area},'=target_roi_idx;']);
 
 end

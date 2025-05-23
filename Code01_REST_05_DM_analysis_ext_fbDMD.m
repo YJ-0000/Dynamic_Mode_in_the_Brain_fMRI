@@ -161,6 +161,8 @@ save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude Phi_sorted lambd
 %% Testing DM consistency
 load DMs/DM_cortical_subcortical_noROInorm_subExclude_CV
 
+cv_num = 5;
+
 max_DMs = 24;
 
 rng(321); % for reproducibility
@@ -210,12 +212,13 @@ for n_dm = 1:max_DMs/2
     consistency_CS_list{n_dm} = CS_mat;
 end
 
-DM_labels = {'Principal DM (DM 1)','SN-to-DMN (DM 2)','Bi-asym (DM 3)','FV-to-SM (DM 4)','SN-to-CEN (DM 5)', ...
+DM_labels = {'Principal DM (DM 1)','SN-to-DMN (DM 2)','SN-to-CEN (DM 3)','FV-to-SM (DM 4)','Bi-asym (DM 5)', ...
              'DM 6','DM 7', 'DM 8', 'DM 9', ...
              'DM 10', 'DM 11', 'DM 12'};
             
 figure;
 count = 0;
+cluster_idx_main([3,5]) = cluster_idx_main([5,3]);
 for n_dm = cluster_idx_main'
     count = count + 1;
     subplot(3,4,count); 
@@ -256,19 +259,20 @@ save_dir = [pwd filesep 'DM_video_HCP_REST_fbDMD'];
 frame_dt = 0.5;
 
 for pair_num = 1:5
-    if pair_num == 1
-        ref_t = 27;
+   if pair_num == 1
+        %%% principal DM
+        ref_t = 30;
     elseif pair_num == 3
-        ref_t = 31;
+        ref_t = 31+30;
     elseif pair_num == 5
         ref_t = 44.5;
     elseif pair_num == 2
-        ref_t = 56.5;
+        ref_t = 56.5 + 19;
     elseif pair_num == 4
-        ref_t = 14;
+        ref_t = 14 + 37.5;
     else
         ref_t = 0;
-    end
+   end
     
     cd(save_dir);
     mkdir(['DM_pair', num2str(pair_num) '_4view']);
@@ -291,9 +295,9 @@ for pair_num = 1:5
         end
         
         atlasinfo.Datatype='double';
-        niftiwrite(eigenstate,['DM_pair', num2str(pair_num), '_', num2str(frame,'%04d')],atlasinfo);
+        niftiwrite(eigenstate,'temp',atlasinfo);
         
-        fh = conn_mesh_display(['DM_pair', num2str(pair_num), '_', num2str(frame,'%04d'), '.nii']);
+        fh = conn_mesh_display('temp.nii');
         fh('colormap','bluewhitered');
         fh('colorbar','on');
         if pair_num == 1
@@ -422,6 +426,6 @@ for n=1:length(tau)
     disp(['end: sub#' num2str(n)]);
 end
 
-save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B tau Phi_sorted lambda D B_mean B_var sub_ids num_DMs
+save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B tau Phi_sorted lambda D B_mean B_var sub_ids num_DMs
 
-save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_global_signal corr_global_signal*
+save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_global_signal corr_global_signal*
