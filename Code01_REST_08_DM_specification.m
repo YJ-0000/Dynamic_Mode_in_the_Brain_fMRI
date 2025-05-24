@@ -1,7 +1,7 @@
 clear; clc; close all;
 %%
-load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm
-load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B
+load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude
+load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B
 %%
 load results/RSFC_standard_grad
 load results/RSFC
@@ -447,7 +447,7 @@ end
 load results/QPP_100_noGSR
 % lambda_indiv_mean = mean(D(2:end,:),2);
 
-ref_t = 28;
+ref_t = 27;
 frame_dt = 0.72;
 frame_num = 278;
 TRtarget = 1.5;
@@ -481,7 +481,7 @@ for n_dm = 1:1
     end
     [max_r,max_idx] = max(corr_time_series);
     disp(['Max correlation with QPP - DM',num2str(n_dm),': ',num2str(max_r,'%.4f'), ' at time t=', num2str(max_idx*frame_dt)]);
-    figure; plot(frame_dt*(0:1:frame_num),corr_time_series_PrincipalGradient_DMN,'LineWidth',2);
+    figure; plot(frame_dt*(0:1:frame_num-1),corr_time_series_PrincipalGradient_DMN(2:end),'LineWidth',2);
     xline(max_idx*frame_dt,'r--');
     xline(max_idx*frame_dt+30*frame_dt,'r--');
 end
@@ -497,7 +497,7 @@ TRtarget = 1.5;
 N = 360;
 reconstructed_timeseries = zeros(N,frame_num+1,9);
 tracking_num = 0;
-for n_dm =[3, 1]
+for n_dm =[2, 1]
     ref_t = 0;
     tracking_num = tracking_num + 1;
     
@@ -556,14 +556,16 @@ for n_dm = 1:5
     if n_dm == 1
         %%% principal DM
         ref_t = 27;
+%         ref_t = 1476.72-10;
     elseif n_dm == 3
-        ref_t = 31;
+        ref_t = 31+30;
     elseif n_dm == 5
-        ref_t = 44.5;
+        ref_t = 43;
     elseif n_dm == 2
-        ref_t = 56.5;
+        ref_t = 56.5 + 19;
+%         ref_t = 1476.72-10;
     elseif n_dm == 4
-        ref_t = 14;
+        ref_t = 14 + 37.5;
     else
         ref_t = 0;
     end
@@ -612,7 +614,7 @@ for n_dm = 1:5
         corr_time_series_PrincipalGradient_DMN(frame+1) = -r(2);
         
         r = corrcoef(eigenstate,RSFC_grad_temp(:,2));
-        corr_time_series_SecondGradient(frame+1) = r(2);
+        corr_time_series_SecondGradient(frame+1) = -r(2);
         
         r = corrcoef(eigenstate,Task_negative_vector);
         corr_time_series_DMN(frame+1) = r(2);
@@ -671,9 +673,9 @@ for n_dm = 1:5
     plot(frame_dt*(0:1:frame_num),corr_time_series_V_attention,'r--','LineWidth',2);
     plot(frame_dt*(0:1:frame_num),corr_time_series_MLI,'g--','LineWidth',2);
     
-    for n_cap = 1:size(CAPs,1)
-        plot(frame_dt*(0:1:frame_num),corr_time_series_CAP(n_cap,:),'-.','LineWidth',1);
-    end
+%     for n_cap = 1:size(CAPs,1)
+%         plot(frame_dt*(0:1:frame_num),corr_time_series_CAP(n_cap,:),'-.','LineWidth',1);
+%     end
     
     for n_cap = 1:7
         plot(frame_dt*(0:1:frame_num),corr_time_series_Yeo_7network(n_cap,:),':','LineWidth',2);
@@ -688,14 +690,26 @@ for n_dm = 1:5
     yline(0.7,'k--');
 
 
+%     legend('Principal Grad','Second Grad','DMN','FPN','salience','Language','D attention','V attention','Lateralized index',...
+%         'CAP1','CAP2','CAP3','CAP4','CAP5','CAP6','CAP7','CAP8',...
+%         'Yeo1-DMN1','Yeo2-SM','Yeo3-CEN','Yeo4-Vis','Yeo5-DAN','Yeo6-VAN','Yeo7-DMN2',...
+%         'Location','southeast');
     legend('Principal Grad','Second Grad','DMN','FPN','salience','Language','D attention','V attention','Lateralized index',...
-        'CAP1','CAP2','CAP3','CAP4','CAP5','CAP6','CAP7','CAP8',...
-        'Yeo1-DMN1','Yeo2-SM','Yeo3-CEN','Yeo4-Vis','Yeo5-DAN','Yeo6-VAN','Yeo7-DMN2',...
+        'Yeo1-SM','Yeo2-Vis','Yeo3-DMN1','Yeo4-DAN','Yeo5-CEN','Yeo6-DMN2','Yeo7-VAN',...
         'Location','southeast');
     %         'Principal Grad (left)', 'Principal Grad (right)', 'Yeo3-CEN (left)','Yeo3-CEN (right)',...
 
     xlabel('time (t)');
     ylabel('correlation');
+    
+    all_corr_timeseries = [corr_time_series_PrincipalGradient_DMN;
+                            corr_time_series_SecondGradient;
+                            corr_time_series_DMN;
+                            corr_time_series_salience;
+                            corr_time_series_D_attention;
+                            corr_time_series_V_attention;
+                            corr_time_series_MLI;
+                            corr_time_series_Yeo_7network]';
 end
 
 %% RSFC grad correlation time course (subcortical gradient)
@@ -769,7 +783,7 @@ for n_dm = 1
     yline(0.7,'k--');
     hold off;
     ylim([-1,1]);
-    legend('Hippocampus','Thalamus','Striatum','Cerebellum','Amygdala','Brainstem');
+    legend('Hippocampus','Amygdala','Thalamus','Striatum','Brainstem','Cerebellum');
 end
 
 %% dFC

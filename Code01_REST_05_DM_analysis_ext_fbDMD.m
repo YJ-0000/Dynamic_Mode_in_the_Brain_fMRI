@@ -155,7 +155,7 @@ Phi_all = [Phi_sorted,Phi_rest];
     
 
 %%
-save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude Phi_sorted lambda A roi_exclude Phi_all
+save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude Phi_sorted lambda A roi_exclude Phi_all remaining_sub_idx
 
 
 %% Testing DM consistency
@@ -261,11 +261,11 @@ frame_dt = 0.5;
 for pair_num = 1:5
    if pair_num == 1
         %%% principal DM
-        ref_t = 30;
+        ref_t = 27;
     elseif pair_num == 3
         ref_t = 31+30;
     elseif pair_num == 5
-        ref_t = 44.5;
+        ref_t = 43;
     elseif pair_num == 2
         ref_t = 56.5 + 19;
     elseif pair_num == 4
@@ -426,6 +426,10 @@ for n=1:length(tau)
     disp(['end: sub#' num2str(n)]);
 end
 
-save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B tau Phi_sorted lambda D B_mean B_var sub_ids num_DMs
+save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B tau Phi_sorted lambda D B_mean B_var sub_ids num_DMs remaining_sub_idx
 
-save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_global_signal corr_global_signal*
+save DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_global_signal corr_global_signal* remaining_sub_idx
+
+mean_corr_global_signal = mean(corr_global_signal(:,remaining_sub_idx),2);
+std_corr_global_signal = std(corr_global_signal(:,remaining_sub_idx),0,2);
+CI_95_corr_global_signal = 1.96*std_corr_global_signal / sqrt(length(remaining_sub_idx));
