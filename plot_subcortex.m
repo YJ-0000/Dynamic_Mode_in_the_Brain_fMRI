@@ -97,15 +97,21 @@ function plot_subcortex(cifti_data, output_plot_path, color_map, min_scale, max_
         elseif cifti_data_select(n_vox) > max_scale
             val = max_scale;
         end
+        
+        if val >= 0
+            color_idx = ceil(val/max_scale * 128 + 128);
+        else
+            color_idx = ceil((val-min_scale)/abs(min_scale) * 128+1);
+        end
 
-        color(n_vox, :) = color_map(ceil((val-min_scale)/(max_scale-min_scale) * 256), :);
+        color(n_vox, :) = color_map(color_idx, :);
     end
     
     scatter_size = 50;
     
     figure;
     scatter3(vox_position(1,:)', vox_position(2,:)', vox_position(3,:)', ...
-        scatter_size, color, 'filled');
+        scatter_size, color, 'filled','MarkerEdgeColor','w');
 
     % Adjusting figure to get better visualization
     axis equal; axis vis3d;
