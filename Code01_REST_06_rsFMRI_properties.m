@@ -222,7 +222,7 @@ for n_area = 1:length(subcortical_areas)
         gradient_cifti_data(labels_subcortical_data==label_select(n_roi)) = score(n_roi,1);
     end
     fprintf('Plot info > min: %.5f, max: %.5f \n',min(score(:,1)), max(score(:,1)));
-    plot_subcortex(gradient_cifti_data,['results/RSFC_',subcortical_areas{n_area},'_grad.jpg'],[],min(coeff(:,1)),max(coeff(:,1)),subcortical_areas{n_area});
+    plot_subcortex(gradient_cifti_data,['results/RSFC_',subcortical_areas{n_area},'_grad.jpg'],[],min(score(:,1)),max(score(:,1)),subcortical_areas{n_area});
     
     eval(['RSFC_grad_',subcortical_areas{n_area},'=score;']);
     eval(['target_roi_idx_',subcortical_areas{n_area},'=target_roi_idx;']);
