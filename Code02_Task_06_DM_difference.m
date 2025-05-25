@@ -48,7 +48,7 @@ for i = 1:num_tasks
     sub_ids_tasks{i} = sub_ids_tasks{i}(idx_task);
 end
 %% coefficients - magnitude
-idx_order = [1,3,9,3,5];
+idx_order = [1,3,9,7,5];
 
 figure; 
 subplot(2,4,1);
@@ -63,7 +63,7 @@ for ii = 1:7
 end
 
 %% coefficients - angle
-idx_order = [1,3,9,3,5];
+idx_order = [1,3,9,7,5];
 
 figure; 
 subplot(2,4,1);
@@ -112,18 +112,21 @@ n_modes = size(normalized_metric_rest, 1);
 % Initialize variables to store t-test results
 p_values_rest_vs_tasks = zeros(n_modes, num_tasks);
 t_stats_rest_vs_tasks = zeros(n_modes, num_tasks);
+cohens_d_rest_vs_tasks = zeros(n_modes, num_tasks);
 
 p_values_tasks_vs_tasks = zeros(n_modes, num_tasks, num_tasks);
 t_stats_tasks_vs_tasks = zeros(n_modes, num_tasks, num_tasks);
+cohens_d_tasks_vs_tasks = zeros(n_modes, num_tasks, num_tasks);
 
 % Perform t-test between Rest and each Task for each mode
 for mode_idx = 1:n_modes
     rest_data = normalized_metric_rest(mode_idx, :);
     for task_idx = 1:num_tasks
         task_data = normalized_metric_tasks{task_idx}(mode_idx, :);
-        [~, p, ~, stats] = ttest(rest_data, task_data);
+        [~, p, ~, stats] = ttest(task_data,rest_data);
         p_values_rest_vs_tasks(mode_idx, task_idx) = p;
         t_stats_rest_vs_tasks(mode_idx, task_idx) = stats.tstat;
+        cohens_d_rest_vs_tasks(mode_idx, task_idx) = (mean(task_data)-mean(rest_data))/stats.sd;
     end
 end
 
@@ -136,6 +139,7 @@ for mode_idx = 1:n_modes
             [~, p, ~, stats] = ttest(data1, data2);
             p_values_tasks_vs_tasks(mode_idx, task_idx1, task_idx2) = p;
             t_stats_tasks_vs_tasks(mode_idx, task_idx1, task_idx2) = stats.tstat;
+            cohens_d_tasks_vs_tasks(mode_idx, task_idx1, task_idx2) = (mean(data1)-mean(data2))/stats.sd;
         end
     end
 end
@@ -189,7 +193,7 @@ load results/colormap_coolwarm
 % Rest vs Tasks Heatmap
 figure;
 % Create t-value heatmap
-imagesc(-t_stats_rest_vs_tasks);
+imagesc(t_stats_rest_vs_tasks);
 colormap(coolwarm);
 colorbar;
 mode_names = {'Principal','SN-to-DMN','SN-to-CEN','FV-to-SM','Bi-asym'};
