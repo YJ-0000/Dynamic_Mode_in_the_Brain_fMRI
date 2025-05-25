@@ -32,7 +32,6 @@ end
 load secure_data/path_info;
 gene_data_table = readtable(gene_data_path,'VariableNamingRule','preserve');
 behav_data_table = readtable(behav_data_path,'VariableNamingRule','preserve');
-freesurfer_data_table = readtable(freesurfer_data_path);
 for nrow = size(gene_data_table,1):-1:1
     if ~any(sub_ids==gene_data_table(nrow,'Subject').Variables)
         gene_data_table(nrow,:) = [];
