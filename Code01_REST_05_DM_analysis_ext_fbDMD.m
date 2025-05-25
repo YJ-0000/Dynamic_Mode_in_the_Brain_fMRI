@@ -370,6 +370,7 @@ global_Phi = mean(Phi_sorted(:,1:2:num_DMs))';
 corr_global_signal = zeros(num_DMs/2,length(tau));
 corr_global_signal_normalized = zeros(num_DMs/2,length(tau));
 corr_global_signal_main_two = zeros(1,length(tau));
+corr_global_signal_main_third = zeros(1,length(tau));
 corr_global_signal_main_two_normalized = zeros(1,length(tau));
 for n=1:length(tau)
     if tau(n) == 0
@@ -410,14 +411,19 @@ for n=1:length(tau)
     r = corrcoef([global_signal',engagement_timeseries']);
     corr_global_signal(:,n) = r(1,2:end);
     
-    r = corrcoef([global_signal',sum(engagement_timeseries([1,3],:))']);
+    % correlation between GS and DM1 + DM2
+    r = corrcoef([global_signal',sum(engagement_timeseries([1,2],:))']);
     corr_global_signal_main_two(n) = r(2);
+    
+    % correlation between GS and DM1 + DM3
+    r = corrcoef([global_signal',sum(engagement_timeseries([1,5],:))']);
+    corr_global_signal_main_third(n) = r(2);
     
     engagement_ratio_timeseries = real(VY(1:2:end,:).* global_Phi)./sum(abs(real(VY(1:2:end,:).* global_Phi)));
     r = corrcoef([global_signal',engagement_ratio_timeseries']);
     corr_global_signal_normalized(:,n) = r(1,2:end);
     
-    r = corrcoef([global_signal',sum(engagement_ratio_timeseries([1,3],:))']);
+    r = corrcoef([global_signal',sum(engagement_ratio_timeseries([1,2],:))']);
     corr_global_signal_main_two_normalized(n) = r(2);
     
     toc
