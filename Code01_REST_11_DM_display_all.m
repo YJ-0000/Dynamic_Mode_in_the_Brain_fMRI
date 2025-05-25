@@ -1,6 +1,8 @@
 clear;clc;
 current_path = pwd;
-load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm
+conn;
+close all;
+load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude.mat
 %%
 cd(current_path);
 labels = cifti_read('atlas/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii');
@@ -100,13 +102,13 @@ for pair_num = 1:12
     if pair_num == 1
         ref_t = 27;
     elseif pair_num == 3
-        ref_t = 31;
+        ref_t = 31+30;
     elseif pair_num == 5
-        ref_t = 44.5;
+        ref_t = 43;
     elseif pair_num == 2
-        ref_t = 56.5;
+        ref_t = 56.5 + 19;
     elseif pair_num == 4
-        ref_t = 14;
+        ref_t = 14 + 37.5;
     else
         ref_t = 0;
     end
@@ -147,9 +149,9 @@ for pair_num = 1:12
                             + ((lambda_conjugate2^((frame*frame_dt+ref_t)/TRtarget))/abs(lambda_conjugate2^(ref_t/TRtarget)))*Phi_sorted(roi,DM_conjugate2_num));
                 end
                 atlasinfo.Datatype='double';
-                niftiwrite(eigenstate,['DM_cortex_pair', num2str(pair_num), '_', num2str(frame,'%04d')],atlasinfo);
+                niftiwrite(eigenstate,'temp',atlasinfo);
 
-                fh = conn_mesh_display(['DM_cortex_pair', num2str(pair_num), '_', num2str(frame,'%04d'), '.nii']);
+                fh = conn_mesh_display('temp.nii');
                 fh('colormap','bluewhitered');
                 fh('background',[1,1,1]);
                 fh('colorbar','on');
