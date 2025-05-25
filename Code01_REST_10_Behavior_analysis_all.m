@@ -1,6 +1,6 @@
 clear; clc;
 %% load data
-load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B
+load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B
 
 [sub_ids,sorted_idx] = sort(sub_ids);
 D = D(:,sorted_idx);
@@ -14,9 +14,13 @@ B_mean(:,tau==0) = [];
 B_var(:,tau==0) = [];
 sub_ids(tau==0) = [];
 
+% D(:,tau<2000) = [];
+% B_mean(:,tau<2000) = [];
+% B_var(:,tau<2000) = [];
+% sub_ids(tau<2000) = [];
 %%
-behav_factor = readtable('./data/scores_04.csv');
-% behav_factor = readtable('./data/scores_05.csv');
+behav_factor = readtable('./data/scores_04_selected.csv');
+% behav_factor = readtable('./data/scores_05_selected.csv');
 
 %%
 load secure_data/path_info;
@@ -66,6 +70,8 @@ edu_year = gene_data_table.SSAGA_Educ;
 
 
 X_rest = [ones(size(age,1),1),age,sex, ICV.^(1/3),TGMV.^(1/3),handedness];
+% X_rest = [ones(size(age,1),1),age,sex, ICV.^(1/3),TGMV.^(1/3)];
+% X_rest = [ones(size(age,1),1),age,sex];
 % X_rest = [ones(size(age,1),1)];
 
 
@@ -135,7 +141,7 @@ for n_dm = 1:num_DM
         r_values_B_mean(n_dm, n_fa) = r_B_mean(2);
     end
 end
-DM_names = {'Principal','FV-to-SM','SN-to-DMN','Bi-asym','SN-to-CEN'};
+DM_names = {'Principal','SN-to-DMN','Bi-asym','FV-to-SM','SN-to-CEN'};
 if num_FA == 4
     col_names = {'Mental Health', 'Cognition', 'Processing Speed', 'Substance Use'};
 elseif num_FA == 5
@@ -232,8 +238,8 @@ disp(array2table(p_values_angle_FWE, 'VariableNames', col_names, 'RowNames', DM_
 
 
 %% Display (heatmap)
-
-DM_names_correct_order = DM_names([1,3,5,2,4]);
+DM_order = [1,2,5,4,3];
+DM_names_correct_order = DM_names(DM_order);
 
 temp_max = max(abs([t_values_B_mean(:); t_values_magnitude(:); t_values_angle(:)]));
 minValue = -temp_max;
@@ -247,16 +253,20 @@ for ii = 1:3
     if ii == 1
         t_values_mat = t_values_B_mean;
         p_FWE_mat = p_values_B_mean_FWE;
+        q_FDR_mat = FDR_B_mean;
     elseif ii ==2
         t_values_mat = t_values_magnitude;
         p_FWE_mat = p_values_magnitude_FWE;
+        q_FDR_mat = FDR_magnitude;
     else
         t_values_mat = t_values_angle;
         p_FWE_mat = p_values_angle_FWE;
+        q_FDR_mat = FDR_angle;
     end
     
-    t_values_mat = t_values_mat([1,3,5,2,4],:);
-    p_FWE_mat = p_FWE_mat([1,3,5,2,4],:);
+    t_values_mat = t_values_mat(DM_order,:);
+    p_FWE_mat = p_FWE_mat(DM_order,:);
+    q_FDR_mat = q_FDR_mat(DM_order,:);
 
     % Display the matrix as an image
     imagesc(t_values_mat);
@@ -343,6 +353,11 @@ for ii = 1:3
                     'HorizontalAlignment', 'center', ...
                     'FontSize', 20, ...                    
                     'Color', 'k');                         % Set text color to red
+%             elseif q_FDR_mat(i,j) < 0.05
+%                 text(j, i + y_offset, '+', ...
+%                     'HorizontalAlignment', 'center', ...
+%                     'FontSize', 20, ...                    
+%                     'Color', 'k');                         % Set text color to red
             end
         end
     end
@@ -353,3 +368,65 @@ for ii = 1:3
     % Optional: Adjust the figure's overall properties for better aesthetics
     set(gcf, 'Color', 'w'); % Set figure background to white
 end
+
+%% scatter plots
+
+for n_metric = 1:3
+    if n_metric == 1
+        metric = BB_mean;
+        metric_resid = BB_mean_resid;
+        metric_name = 'BB\_mean';
+    elseif n_metric == 2
+        metric = abs_D;
+        metric_resid = abs_D_resid;
+        metric_name = 'abs\_D';
+    else
+        metric = angle_D;
+        metric_resid = angle_D_resid;
+        metric_name = 'angle\_D';
+    end
+    
+    figure('Name', metric_name);
+    plot_n = 0;
+    for n_dm = DM_order
+        for n_fa = 1:num_FA
+            plot_n = plot_n + 1;
+            ax = subplot(num_DM, num_FA, plot_n);
+            
+            % 잔차 계산
+            FA_resid = FA_values(:, n_fa) - X_rest * pinv(X_rest) * FA_values(:, n_fa);
+%             x = metric(:, n_dm);
+%             y = FA_resid;
+            x = FA_resid;
+            y = metric(:, n_dm);
+            
+            % 산점도
+            scatter(x, y, 'filled');
+            hold on;
+            
+            % 선형 회귀선 계산 및 그리기
+            p = polyfit(x, y, 1);       % 1차 회귀
+            yfit = polyval(p, x);
+            plot(x, yfit, 'r-', 'LineWidth', 1.5);
+            
+            % 상관계수 계산
+            R = corrcoef(x, y);
+            r = R(1,2);
+            
+            % 축 범위 가져와서 텍스트 위치 계산
+            xl = xlim(ax);
+            yl = ylim(ax);
+            xpos = xl(1) + 0.05 * diff(xl);
+            ypos = yl(2) - 0.10 * diff(yl);
+            text(xpos, ypos, sprintf('r = %.2f', r), 'FontSize', 10, 'Color', 'r');
+            
+            % 레이블
+%             xlabel(sprintf('Metric %d (DM=%d)', n_metric, n_dm));
+%             ylabel(sprintf('FA resid (FA=%d)', n_fa));
+%             title(sprintf('FA %d vs %s (DM %d)', n_fa, metric_name, n_dm));
+            
+            hold off;
+        end
+    end
+end
+
