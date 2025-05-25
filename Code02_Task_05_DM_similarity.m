@@ -1,8 +1,8 @@
 clear; clc; close all;
 %% Load data
 % Load Resting State Data
-load('DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B.mat');
-D_rest = D(2:end, tau ~= 0).^(0.72/1.5);
+load('DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B.mat');
+D_rest = D(2:end, tau ~= 0);
 B_rest = B_mean(1:end, tau ~= 0);
 sub_ids_rest = sub_ids(tau ~= 0);
 
@@ -15,7 +15,7 @@ sub_ids_tasks = cell(1, num_tasks);
 
 % Load Task Data
 for i = 1:num_tasks
-    load(['DMs\DM_tfMRI_', task_names{i} ,'_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B.mat']);
+    load(['DMs\DM_tfMRI_', task_names{i} ,'_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B.mat']);
     D_tasks{i} = D(2:end, tau ~= 0);
     B_tasks{i} = B(1:end, tau ~= 0);
     sub_ids_tasks{i} = sub_ids(tau ~= 0);

@@ -8,13 +8,62 @@ for n_task = 1:length(task_names)
 
     load(['results/HCP_timeseries_tfMRI_',task,'_cortical_subcortical_extracted_filtered_CompCor_meta.mat']);
     load(['results/HCP_timeseries_tfMRI_',task,'_cortical_subcortical_extracted_filtered_CompCor.mat']);
+    load(['results/HCP_timeseries_tfMRI_',task,'_cortical_subcortical_extracted_task_input']);
+    load(['results/HCP_timeseries_tfMRI_',task,'_subject_exclude_info']);
+    
+    %%
+    is_sub_exclude = true;
+    if is_sub_exclude
+        for nsub = 1:length(sub_ids)
+            if does_have_MMSE(nsub) || is_cognitive_impaired(nsub) || is_RL_processing_errors(nsub)
+                time_series_preproc_filtered(nsub,:) = {[],[]}; %#ok<SAGROW>
+            else
+                if is_excluded_due_movement(nsub,1)
+                    time_series_preproc_filtered(nsub,1:2) = {[],[]}; %#ok<SAGROW>
+                end
+            end
+        end
+    end
+
+    remaining_sub_idx = false(length(sub_ids),1);
+    for nsub = 1:length(sub_ids)
+        if ~isempty(time_series_preproc_filtered{nsub,1}) || ~isempty(time_series_preproc_filtered{nsub,2}) 
+            remaining_sub_idx(nsub) = true;
+        end
+    end
+
+    load secure_data/path_info;
+    gene_data_table = readtable(gene_data_path,'VariableNamingRule','preserve');
+    behav_data_table = readtable(behav_data_path,'VariableNamingRule','preserve');
+    for nrow = size(gene_data_table,1):-1:1
+        if ~any(sub_ids==gene_data_table(nrow,'Subject').Variables)
+            gene_data_table(nrow,:) = [];
+        end
+    end
+    for nrow = size(behav_data_table,1):-1:1
+        if ~any(sub_ids==behav_data_table(nrow,'Subject').Variables)
+            behav_data_table(nrow,:) = [];
+        end
+    end
+    gene_data_table = sortrows(gene_data_table, 'Subject');
+    behav_data_table = sortrows(behav_data_table, 'Subject');
+
+    ages = gene_data_table.Age_in_Yrs;
+    genders = behav_data_table.Gender;
+
+    num_female = sum(strcmp(genders(remaining_sub_idx),'F'));
+    mean_age = mean(ages(remaining_sub_idx));
+    std_age = std(ages(remaining_sub_idx));
+
+    fprintf('Total number of subjects: %d, Female=%d, mean age=%0.2f, std=%0.2f \n', ...
+        sum(remaining_sub_idx),num_female,mean_age,std_age);
 
     %%
     n_time = len_time;
 
     t_sample = 0.72;
-    TRtarget = 0.72;
-%     TRtarget = 1.5;
+%     TRtarget = 0.72;
+    TRtarget = 1.5;
 
     t = (1:n_time) * (t_sample);
     t_fine = TRtarget:TRtarget:t(end);
@@ -25,7 +74,7 @@ for n_task = 1:length(task_names)
     i_num = 0;
     sub_ids_estimated = cell(0);
     %%
-    load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm
+    load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude
 
     num_DMs = 10;
 
@@ -95,6 +144,6 @@ for n_task = 1:length(task_names)
     end
 
 
-    save(['DMs/DM_tfMRI_',task,'_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B'],'tau', 'D', 'B', 'sub_ids')
+    save(['DMs/DM_tfMRI_',task,'_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B'],'tau', 'D', 'B', 'sub_ids','TRtarget','remaining_sub_idx')
 
 end

@@ -4,8 +4,8 @@ test_for = 'phase'; % magnitude or phase
 
 %% Load data
 % Load Resting State Data
-load('DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10.mat');
-D_rest = D(2:end, tau ~= 0).^(0.72/1.5);
+load('DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B.mat');
+D_rest = D(2:end, tau ~= 0);
 sub_ids_rest = sub_ids(tau ~= 0);
 
 % List of task files and names
@@ -16,7 +16,7 @@ sub_ids_tasks = cell(1, num_tasks);
 
 % Load Task Data
 for i = 1:num_tasks
-    load(['DMs\DM_tfMRI_', task_names{i} ,'_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10.mat']);
+    load(['DMs\DM_tfMRI_', task_names{i} ,'_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B.mat']);
     D_tasks{i} = D(2:end, tau ~= 0);
     sub_ids_tasks{i} = sub_ids(tau ~= 0);
 end
@@ -40,7 +40,7 @@ for i = 1:num_tasks
 end
 
 %% t-test
-idx_order = [1,5,9,7,3];
+idx_order = [1,3,9,7,5];
 
 phase_rest = angle(D_rest(idx_order,:));
 phase_tasks = cell(1, num_tasks);
@@ -59,7 +59,7 @@ for n_task = 1:num_tasks
     for n_dm = 1:5
         [h,p,~,stat] = ttest(phase_task_1(n_dm,:));
         cohen_d = mean(phase_task_1(n_dm,:)) / stat.sd;
-        fprintf('Significance of DM%d during %s: cohen''s d=%.6f , t=%.6f,  p=%.6f \n', ...
+        fprintf('Significance of DM%d during %s: cohen''s d=%.6f , t=%.6f,  p=%.11f \n', ...
             n_dm,task_names{n_task}, cohen_d, stat.tstat, p);
     end
     disp(' ');

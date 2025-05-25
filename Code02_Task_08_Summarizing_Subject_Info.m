@@ -1,7 +1,7 @@
 clear; clc;
 
 %% Resting
-load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B
+load DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B
 load secure_data/path_info;
 gene_data_table = readtable(gene_data_path,'VariableNamingRule','preserve');
 behav_data_table = readtable(behav_data_path,'VariableNamingRule','preserve');
@@ -39,7 +39,7 @@ num_tasks = length(task_names);
 
 % Load Task Data
 for i = 1:num_tasks
-    load(['DMs\DM_tfMRI_', task_names{i} ,'_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10.mat']);
+    load(['DMs\DM_tfMRI_', task_names{i} ,'_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B.mat']);
     gene_data_table = readtable(gene_data_path,'VariableNamingRule','preserve');
     behav_data_table = readtable(behav_data_path,'VariableNamingRule','preserve');
     for nrow = size(gene_data_table,1):-1:1
@@ -70,7 +70,7 @@ end
 
 %% Common subjects
 % Load Resting State Data
-load('DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B.mat');
+load('DMs/DM_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B.mat');
 sub_ids_rest = sub_ids(tau ~= 0);
 
 % List of task files and names
@@ -80,7 +80,7 @@ sub_ids_tasks = cell(1, num_tasks);
 
 % Load Task Data
 for i = 1:num_tasks
-    load(['DMs\DM_tfMRI_', task_names{i} ,'_cortical_subcortical_ext_fbDMD_noROInorm_indiv_10_B.mat']);
+    load(['DMs\DM_tfMRI_', task_names{i} ,'_cortical_subcortical_ext_fbDMD_noROInorm_subExclude_indiv_10_B.mat']);
     sub_ids_tasks{i} = sub_ids(tau ~= 0);
 end
 
