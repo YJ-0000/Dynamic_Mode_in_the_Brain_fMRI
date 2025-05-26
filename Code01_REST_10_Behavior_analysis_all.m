@@ -69,7 +69,8 @@ edu_year = gene_data_table.SSAGA_Educ;
 
 
 
-X_rest = [ones(size(age,1),1),age,sex, ICV.^(1/3),TGMV.^(1/3),handedness];
+X_rest = [ones(size(age,1),1),age,sex, ICV.^(1/3),TGMV.^(1/3),handedness,tau(tau~=0)>2000];
+% X_rest = [ones(size(age,1),1),age,sex, ICV.^(1/3),TGMV.^(1/3),handedness];
 % X_rest = [ones(size(age,1),1),age,sex, ICV.^(1/3),TGMV.^(1/3)];
 % X_rest = [ones(size(age,1),1),age,sex];
 % X_rest = [ones(size(age,1),1)];
@@ -88,6 +89,13 @@ abs_D = abs(D(1:2:end,:))';
 angle_D = angle(D(1:2:end,:))';
 BB_mean = B_mean(1:2:end,:)';
 
+idx_outlier = zeros(size(BB_mean,1),1);
+% for n_dm = 1:5
+%     idx_outlier = idx_outlier + isoutlier(BB_mean(:,n_dm));
+%     idx_outlier = idx_outlier + isoutlier(abs_D(:,n_dm));
+%     idx_outlier = idx_outlier + isoutlier(angle_D(:,n_dm));
+% end
+
 %% 
 num_FA = size(behav_factor,2)-1;
 num_DM = size(abs_D,2);
@@ -103,6 +111,17 @@ r_values_angle = zeros(num_DM, num_FA);
 r_values_B_mean = zeros(num_DM, num_FA);
 
 FA_values = table2array(behav_factor(:,2:end));
+
+for n_f = 1:num_FA
+    idx_outlier = idx_outlier + isoutlier(FA_values(:,n_f));
+end
+idx_outlier = idx_outlier > 0;
+
+BB_mean(idx_outlier,:) = [];
+abs_D(idx_outlier,:) = [];
+angle_D(idx_outlier,:) = [];
+FA_values(idx_outlier,:) = [];
+X_rest(idx_outlier,:) = [];
 
 BB_mean_resid = BB_mean - X_rest * pinv(X_rest) * BB_mean;
 abs_D_resid = abs_D - X_rest * pinv(X_rest) * abs_D;
@@ -353,11 +372,11 @@ for ii = 1:3
                     'HorizontalAlignment', 'center', ...
                     'FontSize', 20, ...                    
                     'Color', 'k');                         % Set text color to red
-%             elseif q_FDR_mat(i,j) < 0.05
-%                 text(j, i + y_offset, '+', ...
-%                     'HorizontalAlignment', 'center', ...
-%                     'FontSize', 20, ...                    
-%                     'Color', 'k');                         % Set text color to red
+            elseif q_FDR_mat(i,j) < 0.05
+                text(j, i + y_offset, '+', ...
+                    'HorizontalAlignment', 'center', ...
+                    'FontSize', 20, ...                    
+                    'Color', 'k');                         % Set text color to red
             end
         end
     end
@@ -371,6 +390,7 @@ end
 
 %% scatter plots
 
+DM_order = [1,2,5,4,3];
 for n_metric = 1:3
     if n_metric == 1
         metric = BB_mean;
