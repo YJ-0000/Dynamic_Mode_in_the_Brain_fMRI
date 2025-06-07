@@ -118,7 +118,7 @@ rest_self_corr_B_mean = zeros(1,num_DMs/2);
 rest_self_ICC_D_mag = zeros(1,num_DMs/2);
 rest_self_ICC_D_phase = zeros(1,num_DMs/2);
 rest_self_ICC_B_mean = zeros(1,num_DMs/2);
-for n_dm = 1:(num_DMs/2)
+for n_dm = 1:(num_DMs/2)    
     temp_D1 = D1(2*(n_dm),:);
     temp_D2 = D2(2*(n_dm),:);
     temp_B1 = B1_mean(2*(n_dm-1)+1,:);
@@ -137,6 +137,14 @@ for n_dm = 1:(num_DMs/2)
     rest_self_ICC_D_phase(n_dm) = computeICC(angle(temp_D1),angle(temp_D2));
     rest_self_ICC_B_mean(n_dm) = computeICC(temp_B1,temp_B2);
 end
+
+temp_D0_1 = real(D1(1,:));
+temp_D0_2 = real(D2(1,:));
+r = corrcoef(temp_D0_1,temp_D0_2);
+rest_self_corr_autocorr = r(2);
+rest_self_ICC_autocorr = computeICC(temp_D0_1,temp_D0_2);
+
+
 figure; 
 subplot(3,1,1);
 heatmap(rest_self_corr_D_mag);
