@@ -1,7 +1,24 @@
 
 # 2024 Dynamic Mode Brain fMRI
 
-This repository requires the following MATLAB toolboxes and atlases.
+This repository accompanies the manuscript titled "[Large-scale signal propagation modes in the human brain](https://www.sciencedirect.com/science/article/pii/S105381192500360X)."
+
+## Dynamic Modes (DMs)
+<p align="center">
+  <strong>Principal DM (DM1)</strong> (unimodal–transmodal axis) &nbsp;&nbsp; | &nbsp;&nbsp; 
+  <strong>Bi-asym DM (DM5)</strong> (inter-hemispheric propagation)
+</p>
+
+<div align="center">
+  <img src="./visualize/Supplementary_Video_1.gif" 
+       alt="Principal DM - DM1"
+       title="Principal DM (DM1): propagation along unimodal–transmodal axis"
+       width="350" />
+  <img src="./visualize/Supplementary_Video_5.gif" 
+       alt="Bi-asym DM - DM5"
+       title="Bi-asym DM (DM5): inter-hemispheric propagation"
+       width="350" />
+</div>
 
 ## Prerequisites
 
