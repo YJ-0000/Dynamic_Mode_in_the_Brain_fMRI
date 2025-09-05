@@ -102,7 +102,7 @@ Access to restricted and genetic data requires approval from the HCP database.
         
     -   **Code02_Task_02_Extracting_Task_Info.m** – Extract onset and duration of task execution
         
-    -   **Code02_Task_03_Filtering_CompCor_tfMRI.m** – Denoising of task-state data with bandpass filtering, regression of movement regressors, CompCor, detrending, and event-related activation
+    -   **Code02_Task_03_Filtering_CompCor_tfMRI.m** – Denoising of task-state data with bandpass filtering, regression of movement regressors, detrending, and event-related activation
         
     -   **Code02_Task_04_DM_analysis_indiv_fitting.m** – Estimation of DM metrics from task-state data using group-level DM obtained from resting-state dataset
         
