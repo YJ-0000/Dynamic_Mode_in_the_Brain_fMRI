@@ -45,9 +45,30 @@ This repository accompanies the manuscript titled "[Large-scale signal propagati
 -   **Glasser 2016** – [Download Link](https://balsa.wustl.edu/study/RVVG)
     
 -   **The Cole-Anticevic Brain-wide Network Partition** – [GitHub Repository](https://github.com/ColeLab/ColeAnticevicNetPartition)
+
+
+### Human Connectome Project (HCP) Data
+
+The following HCP S1200 data are required for running the analyses in this repository:
+
+- **Resting-state fMRI**
+  - ICA-FIX denoised resting-state fMRI data  
+  - Minimally preprocessed resting-state fMRI data  
+
+- **Task-state fMRI**
+  - Minimally preprocessed task fMRI data (7 tasks: WM, EMOTION, MOTOR, LANGUAGE, GAMBLING, SOCIAL, RELATIONAL)  
+
+- **Demographic and additional data**
+  - Behavioral data (`.csv` file, unrestricted dataset)  
+  - FreeSurfer data (`.csv` file, unrestricted dataset)  
+  - Restricted data (`.csv` file, includes genetic information)  
+
+Access to restricted and genetic data requires approval from the HCP database.
     
 
 ## File Descriptions
+
+-   **Code00_Setup.m** : (**Requires modification!**) Setup script for saving dataset paths that must be downloaded from HCP. *To properly run the other scripts, you first need to execute this setup script after modifying the dataset path variables according to your computing environment.*
 
 -   **Code01_REST_*** : Scripts for analyzing resting-state fMRI data
     
