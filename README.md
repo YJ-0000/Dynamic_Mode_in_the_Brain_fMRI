@@ -52,8 +52,16 @@ This repository accompanies the manuscript titled "[Large-scale signal propagati
 The following HCP S1200 data are required for running the analyses in this repository:
 
 - **Resting-state fMRI**
-  - ICA-FIX denoised resting-state fMRI data  
-  - Minimally preprocessed resting-state fMRI data  
+  - ICA-FIX denoised resting-state fMRI data (REST1 & REST2)
+  - Minimally preprocessed resting-state fMRI data (REST1 & REST2)
+
+> [!NOTE]
+> For reproducibility, it may be helpful to know exactly which datasets were used in our analyses:
+>   - Resting-state fMRI 1 FIX-Denoised (Extended)  
+>   - Resting-state fMRI 2 FIX-Denoised (Extended)  
+>   - Resting-state fMRI 1 Minimally Preprocessed  
+>   - Resting-state fMRI 2 Minimally Preprocessed  
+>   *The Compact version of the FIX-Denoised dataset should also work, since only files included in the Compact release were used. However, the folder structure may differ, so minor modifications to the scripts might be required.*  
 
 - **Task-state fMRI**
   - Minimally preprocessed task fMRI data (7 tasks: WM, EMOTION, MOTOR, LANGUAGE, GAMBLING, SOCIAL, RELATIONAL)  
